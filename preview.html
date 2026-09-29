@@ -119,6 +119,9 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 /* The center of a venue dot is its coordinate, not the top of an offset pin. */
 .mic-pin{width:24px;height:24px;border-radius:50%;transform:translate(-50%,-50%);padding:0}
 .mic-pin.mic-cluster{width:30px;height:30px;background:#fff;color:#245da7;border:2px dashed #245da7;font-weight:bold}
+
+#cards .card-main{grid-template-columns:53px minmax(0,1fr) 40px}
+.filter-options input[type=time]{min-width:0;width:100%;padding:5px;font:12px var(--sans)}
 </style>
   
   
@@ -263,8 +266,8 @@ const weekday=date=>(new Date(date+'T12:00:00Z').getUTCDay()+6)%7;
 const timeText=t=>{if(!t)return 'Not listed';const [h,m]=t.split(':').map(Number);return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;};
 const ago=n=>{if(!n)return 'Never';const d=Math.max(0,Date.now()/1000-n);return d<60?'Just now':d<3600?`${Math.floor(d/60)}m ago`:d<86400?`${Math.floor(d/3600)}h ago`:`${Math.floor(d/86400)}d ago`;};
 const dateText=d=>new Date(d+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
-const getSaved=()=>{try{return JSON.parse(localStorage.getItem('miclist-saved')||'[]');}catch{return [];}};
-const state={data:{listings:[],source_count:0,mode:'empty'},demo:!!window.MICLIST_PREVIEW,day:weekday(nyToday()),borough:'all',search:'',cost:'all',signup:'all',savedOnly:false,saved:new Set(getSaved()),sort:'time',adminTab:'sources',admin:null,community:null,owner:null,preview:null};
+try{localStorage.removeItem('miclist-saved');}catch{}
+const state={data:{listings:[],source_count:0,mode:'empty'},demo:!!window.MICLIST_PREVIEW,day:weekday(nyToday()),borough:'all',search:'',cost:'all',signup:'all',timeFrom:'',timeTo:'',sort:'time',adminTab:'sources',admin:null,community:null,owner:null,preview:null};
 let map;
 state.page=0;state.pageSize=1;state.resultKey='';
 async function api(path,options={}){
@@ -318,9 +321,10 @@ function nextDate(row){
 const claimBadge=r=>`<span class="claim-status ${r.claimed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':'No approved host has claimed this mic.'}">${r.claimed?'Host claimed':'Unclaimed'}</span>`;
 const micTitle=r=>/^open[ -]?mic$/i.test(r.name.trim())?r.venue:r.name;
 const micLink=id=>new URL('/?mic='+encodeURIComponent(id),location.origin==='null'?'https://nycstandupopenmicmaster.vercel.app':location.origin).href;
+function withinTime(time,from,to){if(!from&&!to)return true;if(!time)return false;return from&&to&&from>to?time>=from||time<=to:(!from||time>=from)&&(!to||time<=to);}
 function filtered(){return state.data.listings.filter(r=>{
   if(!occurs(r))return false;if(state.borough!=='all'&&r.borough!==state.borough)return false;
-  if(state.savedOnly&&!state.saved.has(r.id))return false;
+  if(!withinTime(r.start_time,state.timeFrom,state.timeTo))return false;
   if(state.search&&!`${r.name} ${r.venue} ${r.address} ${r.borough} ${r.neighborhood}`.toLowerCase().includes(state.search))return false;
   if(state.cost==='free'&&r.cost!==0)return false;if(['5','10'].includes(state.cost)&&(r.cost===null||r.cost>Number(state.cost)))return false;
   if(state.signup!=='all'&&!String(r.signup_method).toLowerCase().includes(state.signup))return false;return true;
@@ -331,7 +335,7 @@ function renderDirectory(){
   $('#directory-status').textContent=state.demo?'Fictional examples':`${state.data.listings.length} listings`;
   $('#day-filter').innerHTML=[['all','All days'],...DAYS.map((d,i)=>[i,d+(i===weekday(nyToday())?' · Today':'')])].map(([v,d])=>`<option value="${v}" ${String(state.day)===String(v)?'selected':''}>${d}</option>`).join('');
   $('#borough-filter').value=state.borough;
-  const active=state.cost!=='all'||state.signup!=='all'||state.savedOnly;
+  const active=state.cost!=='all'||state.signup!=='all'||state.timeFrom||state.timeTo;
   $('#more-filters').classList.toggle('active',active);
   $('#more-filters').textContent=active?'Filters •':'Filters';
   renderCards();
@@ -340,14 +344,14 @@ function renderDirectory(){
 }
 function renderCards(){
   const rows=filtered(),box=$('#cards');
-  const key=JSON.stringify([state.day,state.borough,state.search,state.cost,state.signup,state.savedOnly,state.sort]);
+  const key=JSON.stringify([state.day,state.borough,state.search,state.cost,state.signup,state.timeFrom,state.timeTo,state.sort]);
   if(key!==state.resultKey){state.page=0;state.resultKey=key;}
   const rowHeight=parseFloat(getComputedStyle(box).getPropertyValue('--row-height'))||52;
   const size=Math.max(1,Math.floor(box.clientHeight/rowHeight));
   if(size!==state.pageSize){state.page=Math.floor(state.page*state.pageSize/size);state.pageSize=size;}
   const pages=Math.max(1,Math.ceil(rows.length/size));state.page=Math.max(0,Math.min(state.page,pages-1));
   const start=state.page*size;
-  $('#result-count').textContent=`${rows.length} ${state.savedOnly?'saved ':''}mic${rows.length===1?'':'s'}`;
+  $('#result-count').textContent=`${rows.length} mic${rows.length===1?'':'s'}`;
   $('#page-count').textContent=`${state.page+1}/${pages}`;
   $('[data-action="previous-page"]').disabled=state.page===0;
   $('[data-action="next-page"]').disabled=state.page>=pages-1;
@@ -358,11 +362,11 @@ function card(r){
   const cost=r.cost===0?'Free':r.cost!=null?`$${r.cost}`:r.cost_text?'See fee':'—';
   const located=r.status==='scheduled'&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);
   const title=micTitle(r),venue=`${title===r.venue?(r.neighborhood||r.borough):r.venue} · ${title===r.venue?r.address:r.borough}`;
-  return `<article class="mic-card" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):r.date?esc(dateText(r.date)):esc(DAYS[r.weekday]?.slice(0,3)||'TBD')}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button>${claimBadge(r)}</div>${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}</div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div><button class="save-button ${state.saved.has(r.id)?'saved':''}" data-action="save" data-id="${esc(r.id)}" aria-label="${state.saved.has(r.id)?'Unsave':'Save'} ${esc(r.name)}" aria-pressed="${state.saved.has(r.id)}">${state.saved.has(r.id)?'♥':'♡'}</button></div></article>`;
+  return `<article class="mic-card" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):r.date?esc(dateText(r.date)):esc(DAYS[r.weekday]?.slice(0,3)||'TBD')}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button>${claimBadge(r)}</div>${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}</div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
 }
 function filtersDialog(){
   const option=(v,t,current)=>`<option value="${v}" ${current===v?'selected':''}>${t}</option>`;
-  modal('Filters',`<div class="filter-options"><label>Entry fee<select id="cost">${[['all','Any price'],['free','Free'],['5','$5 or less'],['10','$10 or less']].map(([v,t])=>option(v,t,state.cost)).join('')}</select></label><label>Signup<select id="signup-filter">${[['all','Any method'],['online','Online'],['in person','In person'],['lottery','Lottery']].map(([v,t])=>option(v,t,state.signup)).join('')}</select></label><label>Sort<select id="sort">${[['time','Date & time'],['price','Lowest fee'],['name','Mic name']].map(([v,t])=>option(v,t,state.sort)).join('')}</select></label><label class="saved-option"><input id="saved-only" type="checkbox" ${state.savedOnly?'checked':''}>Saved only (${state.saved.size})</label></div>`,button('Reset','reset')+button('Done','close','','primary'));
+  modal('Filters',`<div class="filter-options"><label>Entry fee<select id="cost">${[['all','Any price'],['free','Free'],['5','$5 or less'],['10','$10 or less']].map(([v,t])=>option(v,t,state.cost)).join('')}</select></label><label>Signup<select id="signup-filter">${[['all','Any method'],['online','Online'],['in person','In person'],['lottery','Lottery']].map(([v,t])=>option(v,t,state.signup)).join('')}</select></label><label>Sort<select id="sort">${[['time','Date & time'],['price','Lowest fee'],['name','Mic name']].map(([v,t])=>option(v,t,state.sort)).join('')}</select></label><label>Start time from<input id="time-from" type="time" value="${esc(state.timeFrom)}"></label><label>Start time until<input id="time-to" type="time" value="${esc(state.timeTo)}"></label></div>`,button('Reset','reset')+button('Done','close','','primary'));
 }
 function findMic(id){return state.data.listings.find(r=>r.id===id)||state.community?.listings?.find(r=>r.id===id)||state.owner?.listings?.find(r=>r.id===id);}
 function details(id,tab='mic',page=0){
@@ -373,7 +377,7 @@ function details(id,tab='mic',page=0){
   if(tab==='mic'){
     body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('WHEN',`${r.date?dateText(r.date):DAYS[r.weekday]} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('METHOD',r.signup_method||'Not listed')}${item('STATUS',r.status+' · '+(r.claimed?'Host claimed':'Unclaimed'))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?badslava\.com\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
   }else if(tab==='link'){
-    body=`<label for="mic-link">Link to this mic</label><input class="input-full" id="mic-link" readonly value="${esc(micLink(id))}"><div class="detail-actions">${button('Copy link','copy-mic-link',id)}${button(state.saved.has(id)?'Unsave':'Save mic','detail-save',id)}</div><p class="form-helper">No account needed to save mics on this device.</p>`;
+    body=`<label for="mic-link">Link to this mic</label><input class="input-full" id="mic-link" readonly value="${esc(micLink(id))}"><div class="detail-actions">${button('Copy link','copy-mic-link',id)}</div>`;
   }else{
     const text=tab==='notes' ?[r.notes,r.purchase_minimum&&`Purchase minimum: ${r.purchase_minimum}`,r.excluded_dates?.length&&`Not running: ${r.excluded_dates.map(dateText).join(', ')}`,r.conflicts?.length&&`Sources disagree: ${r.conflicts.join(', ')}`,r.stale&&'Source needs a recheck.',r.curated&&'Edited by an administrator or approved host.'].filter(Boolean).join('\n\n')||'No additional notes.':null;
     const texts=tab==='notes'?[text]:(r.sources||[]).map(source=>[source.name,source.kind==='upload'?'Uploaded snapshot':`Checked ${ago(source.checked_at)}`,source.missing_count?'Missing from latest source.':'',source.values?Object.entries(source.values).map(([k,v])=>`${k}: ${v}`).join('\n'):''].filter(Boolean).join('\n'));
@@ -470,7 +474,7 @@ document.addEventListener('click',async e=>{
     if(action==='close')$('#modal').close();
     if(action==='how')how();
     if(action==='refresh'){await loadPublic();toast('Loaded the latest saved listings.');}
-    if(action==='reset'){Object.assign(state,{day:'all',borough:'all',search:'',cost:'all',signup:'all',savedOnly:false});$('#search').value='';if($('#cost'))$('#cost').value='all';if($('#signup-filter'))$('#signup-filter').value='all';if($('#saved-only'))$('#saved-only').checked=false;renderDirectory();}
+    if(action==='reset'){Object.assign(state,{day:'all',borough:'all',search:'',cost:'all',signup:'all',timeFrom:'',timeTo:''});$('#search').value='';if($('#cost'))$('#cost').value='all';if($('#signup-filter'))$('#signup-filter').value='all';if($('#time-from'))$('#time-from').value='';if($('#time-to'))$('#time-to').value='';renderDirectory();}
     if(action==='filters')filtersDialog();
     if(action==='previous-page'||action==='next-page'){state.page+=action==='next-page'?1:-1;renderCards();}
     if(action==='detail-tab')details(id,el.dataset.tab,Number(el.dataset.page||0));
@@ -480,11 +484,8 @@ document.addEventListener('click',async e=>{
       try{await navigator.clipboard.writeText(micLink(id));toast('Link copied.');}
       catch{$('#mic-link').focus();$('#mic-link').select();toast('Select and copy this link.');}
     }
-    if(action==='detail-save'){state.saved.has(id)?state.saved.delete(id):state.saved.add(id);try{localStorage.setItem('miclist-saved',JSON.stringify([...state.saved]));}catch{}renderDirectory();details(id,'link');}
 
     if(action==='locate'&&!map?.focus(id))toast('This mic has no map location yet.');
-    if(action==='save'){state.saved.has(id)?state.saved.delete(id):state.saved.add(id);try{localStorage.setItem('miclist-saved',JSON.stringify([...state.saved]));}catch{}renderDirectory();}
-    if(action==='toggle-saved'||action==='saved-nav'){state.savedOnly=!state.savedOnly;if(location.pathname!=='/'){location.href='/';return;}renderDirectory();}
     if(action==='demo'){state.demo=true;state.data=demoData();renderDirectory();}
     if(action==='exit-demo'){state.demo=false;await loadPublic();}
     if(action==='export'){if(state.demo){toast('Demo data is not a real schedule. Export is available after importing real sources.');return;}location.href='/api/export.csv';}
@@ -517,7 +518,8 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',async e=>{const t=e.target;try{
   if(t.id==='day-filter'){state.day=t.value==='all'?'all':Number(t.value);renderDirectory();}
   if(t.id==='borough-filter'){state.borough=t.value;renderDirectory();}
-  if(t.id==='saved-only'){state.savedOnly=t.checked;renderDirectory();}
+  if(t.id==='time-from'){state.timeFrom=t.value;renderDirectory();}
+  if(t.id==='time-to'){state.timeTo=t.value;renderDirectory();}
   if(t.id==='cost'){state.cost=t.value;renderDirectory();}
   if(t.id==='signup-filter'){state.signup=t.value;renderDirectory();}
   if(t.id==='sort'){state.sort=t.value;renderDirectory();}

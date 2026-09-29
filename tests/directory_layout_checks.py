@@ -65,11 +65,14 @@ with sync_playwright() as p:
     page.locator('#borough-filter').select_option('Brooklyn')
     assert page.evaluate('state.page')==0
     assert all('Brooklyn' in text for text in page.locator('.venue-line').all_text_contents())
-    page.locator('.save-button').first.click()
+    assert page.locator('.save-button,[data-action=save],[data-action=detail-save]').count()==0
     page.locator('#more-filters').click()
-    page.locator('#saved-only').check()
+    page.locator('#time-from').fill('18:00')
+    page.locator('#time-to').fill('20:00')
     page.get_by_role('button', name='Done', exact=True).click()
-    assert page.locator('.mic-card').count()==1
+    assert page.evaluate("filtered().every(r=>r.start_time==='19:00')")
+    assert page.locator('.mic-card').count()>0
+    assert page.evaluate("withinTime('23:00','22:00','02:00') && withinTime('01:00','22:00','02:00') && !withinTime('12:00','22:00','02:00')")
     page.locator('#search').fill('no such mic')
     assert page.locator('.blank-state').is_visible()
     page.get_by_role('button', name='Reset filters', exact=True).click()
