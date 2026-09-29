@@ -38,6 +38,9 @@ with sync_playwright() as p:
         page.locator('.mic-title').first.click()
         modal = page.locator('#modal')
         assert modal.evaluate('(el)=>el.scrollHeight<=el.clientHeight+1'), (width,height,'mic details scroll')
+        page.locator('[data-action=detail-tab][data-tab=link]').click()
+        assert modal.evaluate('(el)=>el.scrollHeight<=el.clientHeight+1'), (width,height,'link details scroll')
+        assert '?mic=' in page.locator('#mic-link').input_value()
         page.get_by_role('button', name='Close dialog').click()
         page.locator('#more-filters').click()
         assert modal.evaluate('(el)=>el.scrollHeight<=el.clientHeight+1'), (width,height,'filters scroll')
@@ -75,6 +78,12 @@ with sync_playwright() as p:
     assert page.locator('.popup-pages').is_visible()
     assert page.locator('.map-popup').evaluate('(el)=>el.scrollHeight<=el.clientHeight+1')
     assert not page.locator('a[href="/admin"]').count()
+    dates=page.evaluate("""() => {
+      const today=nyToday(),day=weekday(today),next=new Date(today+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+7);
+      return [nextDate({weekday:day}),nextDate({weekday:day,excluded_dates:[today]}),today,next.toISOString().slice(0,10)];
+    }""")
+    assert dates[0]==dates[2] and dates[1]==dates[3], dates
+    assert page.evaluate("micTitle({name:'Open Mic',venue:'QED'})")=='QED'
     assert not errors, errors
     browser.close()
     print(json.dumps({'viewports':results,'pagination':'21 unique mics reachable','page_errors':errors},indent=2))
