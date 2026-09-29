@@ -115,6 +115,10 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 .claim-status{display:inline-block;flex:none;font:9px/13px var(--sans);color:#657080;border:1px solid #d3d9e0;background:#f1f3f6;padding:0 3px;white-space:nowrap;border-radius:2px}
 .claim-status.is-claimed{color:#245d32;border-color:#a9c5af;background:#e9f4eb}
 .popup-mic .claim-status{font:9px/13px var(--sans);margin-left:4px}
+
+/* The center of a venue dot is its coordinate, not the top of an offset pin. */
+.mic-pin{width:24px;height:24px;border-radius:50%;transform:translate(-50%,-50%);padding:0}
+.mic-pin.mic-cluster{width:30px;height:30px;background:#fff;color:#245da7;border:2px dashed #245da7;font-weight:bold}
 </style>
   
   
@@ -167,7 +171,7 @@ class MicMap {
     this.plane = root.querySelector('.tile-plane'); this.pins = root.querySelector('.pin-plane');
     this.popup = root.querySelector('.map-popup'); this.loaded = 0; this.failed = 0;
     root.querySelectorAll('[data-map]').forEach(b => b.addEventListener('click', () => {
-      this.zoom = Math.max(8, Math.min(17, this.zoom + (b.dataset.map === 'in' ? 1 : -1))); this.hide(); this.draw();
+      this.zoom = Math.max(8, Math.min(19, this.zoom + (b.dataset.map === 'in' ? 1 : -1))); this.hide(); this.draw();
     }));
     let drag = null;
     root.addEventListener('pointerdown', e => {
@@ -199,7 +203,7 @@ class MicMap {
   focus(id){
     const row=this.rows.find(r=>r.id===id);
     if(!row||!Number.isFinite(row.latitude)||!Number.isFinite(row.longitude))return false;
-    this.center=[row.latitude,row.longitude];this.zoom=Math.max(this.zoom,13);this.initialFit=true;
+    this.center=[row.latitude,row.longitude];this.zoom=Math.max(this.zoom,17);this.initialFit=true;
     this.hide();this.draw();
     this.show([row],this.root.clientWidth/2,this.root.clientHeight/2);
     return true;
@@ -219,17 +223,17 @@ class MicMap {
     this.pins.replaceChildren();
     if(this.zoom<=11)for(const [name,lat,lng]of [['Manhattan',40.795,-73.988],['Brooklyn',40.635,-73.95],['Queens',40.735,-73.78],['Bronx',40.87,-73.86],['Staten Island',40.555,-74.16]]){const [x,y]=this.project(lat,lng);const label=document.createElement('span');label.className='map-borough';label.textContent=name;label.style.left=`${x-left}px`;label.style.top=`${y-top}px`;this.pins.append(label);}
     const groups=new Map();
-    for(const row of this.rows){if(!Number.isFinite(row.latitude)||!Number.isFinite(row.longitude))continue;const key=`${row.latitude.toFixed(5)}|${row.longitude.toFixed(5)}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
+    for(const row of this.rows){if(!Number.isFinite(row.latitude)||!Number.isFinite(row.longitude))continue;const key=`${row.latitude}|${row.longitude}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
     const clusters=[];
     for(const rows of groups.values()){
       const row=rows[0],[px,py]=this.project(row.latitude,row.longitude),x=px-left,y=py-top;
       if(x<-40||y<-40||x>w+40||y>h+40)continue;
-      const nearby=clusters.find(c=>Math.abs(c.x-x)<42&&Math.abs(c.y-y)<44);
-      if(nearby){const total=nearby.rows.length+rows.length;nearby.x=(nearby.x*nearby.rows.length+x*rows.length)/total;nearby.y=(nearby.y*nearby.rows.length+y*rows.length)/total;nearby.rows.push(...rows);}
+      const nearby=this.zoom<15&&clusters.find(c=>Math.abs(c.x-x)<42&&Math.abs(c.y-y)<44);
+      if(nearby){const total=nearby.rows.length+rows.length;nearby.x=(nearby.x*nearby.rows.length+x*rows.length)/total;nearby.y=(nearby.y*nearby.rows.length+y*rows.length)/total;nearby.rows.push(...rows);nearby.grouped=true;}
       else clusters.push({x,y,rows:[...rows]});
     }
-    for(const {x,y,rows} of clusters){
-      const button=document.createElement('button');button.type='button';button.className='mic-pin';button.dataset.count=rows.length;button.textContent=rows.length>1?rows.length:'•';button.style.left=`${x}px`;button.style.top=`${y}px`;button.setAttribute('aria-label',rows.length>1?`${rows.length} nearby mics`:`Mic at ${rows[0].venue}`);button.title=rows.map(r=>r.name).join(', ');button.addEventListener('click',()=>this.show(rows,x,y));this.pins.append(button);
+    for(const {x,y,rows,grouped=false} of clusters){
+      const button=document.createElement('button');button.type='button';button.className='mic-pin'+(grouped?' mic-cluster':'');button.dataset.count=rows.length;button.textContent=rows.length>1?rows.length:'•';button.style.left=`${x}px`;button.style.top=`${y}px`;button.setAttribute('aria-label',grouped?`Zoom into ${rows.length} nearby mics`:`${rows.length} mic${rows.length===1?'':'s'} at ${rows[0].venue}`);button.title=grouped?'Nearby venues — click to zoom':rows[0].venue;button.addEventListener('click',()=>{if(grouped){this.center=this.unproject(x+left,y+top);this.zoom=Math.min(19,this.zoom+2);this.hide();this.draw();}else this.show(rows,x,y);});this.pins.append(button);
     }
   }
   show(rows,x,y,page=0){

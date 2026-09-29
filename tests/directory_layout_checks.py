@@ -89,6 +89,29 @@ with sync_playwright() as p:
     }""")
     assert dates[0]==dates[2] and dates[1]==dates[3], dates
     assert page.evaluate("micTitle({name:'Open Mic',venue:'QED'})")=='QED'
+    # Nearby venues may cluster at city scale, but never shift venue dots at street scale.
+    page.evaluate("""() => {
+      const base=state.data.listings[0];
+      map.rows=[{...base,id:'pin-a',latitude:40.72,longitude:-73.99},
+                {...base,id:'pin-b',latitude:40.7201,longitude:-73.9899}];
+      map.center=[40.72,-73.99];map.zoom=14;map.draw();
+    }""")
+    assert page.locator('.mic-cluster').count()==1
+    page.locator('.mic-cluster').click()
+    assert page.evaluate('map.zoom')==16
+    assert page.locator('.mic-pin').count()==2
+    assert page.locator('.mic-cluster').count()==0
+    offsets=page.evaluate("""() => {
+      const bounds=map.root.getBoundingClientRect(),[cx,cy]=map.project(...map.center);
+      return [...map.pins.querySelectorAll('.mic-pin')].map((pin,i)=>{
+        const r=pin.getBoundingClientRect(),[x,y]=map.project(map.rows[i].latitude,map.rows[i].longitude);
+        return Math.hypot((r.left+r.right)/2-bounds.left-map.root.clientLeft-(x-cx+map.root.clientWidth/2),
+                          (r.top+r.bottom)/2-bounds.top-map.root.clientTop-(y-cy+map.root.clientHeight/2));
+      });
+    }""")
+    assert max(offsets)<1, offsets
+    page.evaluate("map.focus('pin-a')")
+    assert page.evaluate('map.zoom')>=17
     assert not errors, errors
     browser.close()
     print(json.dumps({'viewports':results,'pagination':'21 unique mics reachable','page_errors':errors},indent=2))
