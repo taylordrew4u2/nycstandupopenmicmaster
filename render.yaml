@@ -1,0 +1,23 @@
+# Deployment blueprint only. No hosting resources have been provisioned.
+# An always-on service plus persistent disk is required; review hosting charges.
+services:
+  - type: web
+    name: nyc-mic-list
+    runtime: docker
+    healthCheckPath: /api/health
+    numInstances: 1
+    disk:
+      name: miclist-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: PUBLIC_ORIGIN
+        sync: false
+      - key: LOCAL_DEV
+        value: "0"
+      - key: SCHEDULER_ENABLED
+        value: "1"
+      - key: GEOCODING_ENABLED
+        value: "1"

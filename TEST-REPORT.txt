@@ -1,0 +1,30 @@
+NYC STAND UP OPEN MIC MASTER / BUILD VERIFICATION
+
+Backend: 17 tests passed.
+JavaScript: app.js and map.js passed node --check.
+Browser: Chromium 133, headless; zero uncaught page errors.
+
+Compact directory verification:
+- 1440x900, 1024x768, 768x1024, 390x844, 360x640, 320x568,
+  320x400, 844x390 and 568x320.
+- No vertical or horizontal document overflow; no scrolling results container.
+- At least two compact mic rows visible at every tested size.
+- Map and search/day/borough/filter controls remain visible.
+- Every one of 21 demo mics reached exactly once by listing pagination.
+- All matching mapped mics retained on the map across result pages.
+- Filter changes reset pagination. Saved, empty state and reset checks pass.
+- Mic details and filter dialogs fit every tested viewport without scrolling.
+- Large map groups use popup pagination; venue links focus the map.
+- No public admin link.
+
+Existing browser workflow verification:
+- All seven weekday filters, grouped map pins, popups and mic details.
+- Admin login/logout, all admin tabs, manual listing creation and upload form.
+
+Browser tests use local HTML with an in-process API transport.
+External map tiles were intentionally excluded from automated checks.
+No public deployment, real source fetching or live geocoding was verified.
+Preview data is fictional. No real sources are connected by default.
+
+Only approved mic owners can log in and edit their approved listings.
+Backend tests cover ownership scoping and session revocation after losing the last mic.

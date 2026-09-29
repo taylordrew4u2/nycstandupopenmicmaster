@@ -1,0 +1,8 @@
+id,name,venue,address,borough,weekday,start_time,signup_time,cost,set_minutes,signup_method,notes,status,latitude,longitude
+sample-monday,DEMO Monday Five,Example Manhattan Room,Illustrative location only,Manhattan,Monday,7:00 PM,6:30 PM,5,5,In person,Fictional sample. Not a real mic.,scheduled,40.754,-73.989
+sample-tuesday,DEMO Tuesday Five,Example Brooklyn Room,Illustrative location only,Brooklyn,Tuesday,7:00 PM,6:30 PM,Free,5,In person,Fictional sample. Not a real mic.,scheduled,40.696,-73.928
+sample-wednesday,DEMO Wednesday Five,Example Queens Room,Illustrative location only,Queens,Wednesday,7:00 PM,6:30 PM,5,5,Online signup,Fictional sample. Not a real mic.,scheduled,40.704,-73.904
+sample-thursday,DEMO Thursday Five,Example Bronx Room,Illustrative location only,Bronx,Thursday,7:00 PM,6:30 PM,Free,5,In person,Fictional sample. Not a real mic.,scheduled,40.828,-73.921
+sample-friday,DEMO Friday Five,Example Staten Island Room,Illustrative location only,Staten Island,Friday,7:00 PM,6:30 PM,5,5,In person,Fictional sample. Not a real mic.,scheduled,40.640,-74.079
+sample-saturday,DEMO Saturday Five,Example Manhattan Room,Illustrative location only,Manhattan,Saturday,7:00 PM,6:30 PM,Free,5,In person,Fictional sample. Not a real mic.,scheduled,40.754,-73.989
+sample-sunday,DEMO Sunday Five,Example Brooklyn Room,Illustrative location only,Brooklyn,Sunday,7:00 PM,6:30 PM,5,5,In person,Fictional sample. Not a real mic.,scheduled,40.696,-73.928

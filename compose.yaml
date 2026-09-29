@@ -1,0 +1,16 @@
+services:
+  miclist:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD before starting the service}
+      LOCAL_DEV: "1"
+      SCHEDULER_ENABLED: "1"
+      GEOCODING_ENABLED: "1"
+      DATABASE_PATH: /data/miclist.sqlite3
+    volumes:
+      - miclist-data:/data
+    restart: unless-stopped
+volumes:
+  miclist-data:
