@@ -3,7 +3,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt && useradd -m -u 10001 miclist && mkdir /data && chown miclist /data
 COPY --chown=miclist:miclist app ./app
-COPY --chown=miclist:miclist public ./public
+COPY --chown=miclist:miclist assets ./assets
 USER miclist
 ENV DATABASE_PATH=/data/miclist.sqlite3 LOCAL_DEV=0 SCHEDULER_ENABLED=1 GEOCODING_ENABLED=1
 EXPOSE 8000

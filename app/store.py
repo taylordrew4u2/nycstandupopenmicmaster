@@ -1,8 +1,9 @@
-"""Durable SQLite storage, source observations, history and conservative deduplication."""
+"""Durable PostgreSQL/SQLite storage, history and conservative deduplication."""
 import hashlib
 import json
 import sqlite3
 import time
+import threading
 import uuid
 from collections import Counter, defaultdict
 from contextlib import contextmanager
@@ -51,17 +52,48 @@ def digest(data):
 class Store:
     def __init__(self, path):
         self.path = str(path)
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with self.connect() as conn:
-            conn.executescript(SCHEMA)
-            from .community import SCHEMA as COMMUNITY_SCHEMA
-            conn.executescript(COMMUNITY_SCHEMA)
+        self.postgres = self.path.startswith(('postgres://', 'postgresql://'))
+        self._ready = False
+        self._schema_lock = threading.Lock()
 
-    @contextmanager
-    def connect(self):
+    def _open(self):
+        if self.postgres:
+            from .database import PostgresConnection
+            return PostgresConnection(self.path)
+        if not self.path:
+            raise RuntimeError('Set DATABASE_URL to a PostgreSQL connection URL before deploying on Vercel.')
+        Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(self.path, timeout=15)
         conn.row_factory = sqlite3.Row
         conn.execute('PRAGMA foreign_keys=ON')
+        return conn
+
+    def _initialize(self):
+        # No network calls or database files at module import/build time.
+        with self._schema_lock:
+            if self._ready:
+                return
+            conn = self._open()
+            try:
+                if self.postgres:
+                    from .database import SCHEMA_LOCK
+                    conn.execute('SELECT pg_advisory_xact_lock(?)', (SCHEMA_LOCK,))
+                conn.executescript(SCHEMA)
+                from .community import SCHEMA as COMMUNITY_SCHEMA
+                conn.executescript(COMMUNITY_SCHEMA)
+                conn.commit()
+                self._ready = True
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+    @contextmanager
+    def connect(self):
+        if not self._ready:
+            self._initialize()
+        conn = self._open()
         try:
             yield conn
             conn.commit()
