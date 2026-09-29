@@ -130,8 +130,8 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 #cards .mic-meta .venue-line{flex:1;min-width:0;width:auto}
 #cards .mic-cost{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
 .site-menu{position:relative;flex:none}.site-menu summary{list-style:none;cursor:pointer;color:white;font-size:22px;line-height:26px;padding:0 5px}.site-menu summary::-webkit-details-marker{display:none}
-.site-menu nav{position:absolute;right:0;top:calc(100% + 6px);width:145px;padding:3px;background:#f5f4ed;border:1px solid #8799ae;box-shadow:2px 3px 5px #0003;z-index:30}
-.site-menu nav a,.site-menu nav button{display:block;width:100%;border:0;background:none;text-align:left;padding:8px;color:#20334a;font:12px var(--sans)}
+.site-menu nav{display:flex;flex-direction:column;align-items:stretch;gap:0;margin:0;position:absolute;right:0;top:calc(100% + 6px);width:145px;padding:3px;background:#f5f4ed;border:1px solid #8799ae;box-shadow:2px 3px 5px #0003;z-index:30}
+.site-menu nav a,.site-menu nav button{display:block;flex:none;white-space:nowrap;width:100%;border:0;background:none;text-align:left;padding:8px;color:#20334a;font:12px var(--sans)}
 .site-menu nav a:hover,.site-menu nav button:hover{background:#dce9f8}.donation-options{display:flex;gap:10px;margin:16px 0}
 
 #cards{--row-height:66px}#cards .card-main{padding:3px 6px}
