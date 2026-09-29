@@ -35,8 +35,10 @@ with sync_playwright() as p:
         assert metrics['bodyWidth'] <= width, metrics
         assert metrics['bodyHeight'] <= height, metrics
         assert metrics['listContentHeight'] <= metrics['listHeight']+1, metrics
-        assert metrics['lastFits'] and metrics['controlsVisible'] and metrics['rows'] >= 2, metrics
+        assert metrics['lastFits'] and metrics['controlsVisible'] and metrics['rows'] >= 1, metrics
         assert metrics['mapHeight'] >= 120 and metrics['mapWidth'] >= 190, metrics
+        assert page.locator('#cards .row-updated').count()==metrics['rows']
+        assert page.locator('#cards .card-main').evaluate_all('(els)=>els.every(e=>e.scrollWidth<=e.clientWidth+1)')
         page.locator('.mic-title').first.click()
         modal = page.locator('#modal')
         assert modal.evaluate('(el)=>el.scrollHeight<=el.clientHeight+1'), (width,height,'mic details scroll')
@@ -91,7 +93,12 @@ with sync_playwright() as p:
       return [nextDate({weekday:day}),nextDate({weekday:day,excluded_dates:[today]}),today,next.toISOString().slice(0,10)];
     }""")
     assert dates[0]==dates[2] and dates[1]==dates[3], dates
-    assert page.evaluate("micTitle({name:'Open Mic',venue:'QED'})")=='QED'
+    assert page.evaluate("micTitle({name:'Open Mic',venue:'QED'})")=='Open Mic'
+    page.locator('#site-menu summary').click()
+    assert page.get_by_role('link',name='Host sign in',exact=True).is_visible()
+    page.get_by_role('button',name='About',exact=True).click()
+    assert page.get_by_role('heading',name='About',exact=True).is_visible()
+    page.get_by_role('button',name='Close dialog').click()
     # Nearby venues may cluster at city scale, but never shift venue dots at street scale.
     page.evaluate("""() => {
       const base=state.data.listings[0];

@@ -23,6 +23,9 @@ NY = ZoneInfo('America/New_York')
 DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island']
 ALIASES = {
+    'display_name': ['display name'],
+    'host_names': ['host names', 'hosts', 'host'],
+    'host_socials': ['host socials', 'social links'],
     'external_id': ['id', 'event id', 'mic id', 'external id'],
     'latitude': ['latitude', 'lat'],
     'longitude': ['longitude', 'lng', 'lon'],
@@ -278,6 +281,9 @@ def normalize_rows(raw_rows, config):
                 raise ValueError('latitude and longitude must be provided together')
             if lat is not None and not (40.47 <= lat <= 40.93 and -74.27 <= lng <= -73.68):
                 raise ValueError('coordinates are outside the NYC map bounds')
+            social_links = [safe_link(u) for u in re.split(r'[\s,]+', clean(mapped['host_socials'])) if u]
+            if len(social_links)>5 or any(not u for u in social_links):
+                raise ValueError('Provide up to five complete https:// social links')
             for day in days:
                 schedule = event_date or f'weekly:{day}'
                 # Time is excluded so a time change updates the existing observation.
@@ -287,6 +293,8 @@ def normalize_rows(raw_rows, config):
                 rows.append({
                     'remote_key': remote_key, 'external_id': external_id,
                     'latitude': lat, 'longitude': lng,
+                    'display_name': clean(mapped['display_name'])[:180],
+                    'host_names': clean(mapped['host_names'])[:180], 'host_socials': '\n'.join(social_links),
                     'name': name[:180], 'venue': venue[:180], 'address': clean(mapped['address'])[:300],
                     'borough': borough, 'neighborhood': clean(mapped['neighborhood'])[:100],
                     'weekday': day, 'date': event_date, 'start_time': start, 'signup_time': signup,
