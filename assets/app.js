@@ -225,7 +225,6 @@ document.addEventListener('click',async e=>{
   try{
     if(action==='close')$('#modal').close();
     if(action==='how')how();
-    if(action==='about'){modal('About','<p>Find NYC stand up open mics by day, time, and borough. Only approved mic hosts can sign in to edit their listings.</p><p>Check the source or venue before heading out.</p>');}
     if(action==='donate'){modal('Donate','<p>Support NYC Stand Up Open Mic Master.</p><div class="donation-options"><button class="button quiet" disabled>Cash App</button><button class="button quiet" disabled>Venmo</button></div><p class="form-helper">Donation links coming soon.</p>');}
 
     if(action==='refresh'){await loadPublic();toast('Loaded the latest saved listings.');}

@@ -330,12 +330,25 @@ def create_app(db_path=None):
     from .community import register
     register(app, store, admin, local_dev)
 
+    @app.get('/about')
+    async def about():
+        return FileResponse(ROOT / 'assets' / 'about.html')
+
+    @app.get('/robots.txt')
+    async def robots():
+        return Response('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://nycstandupopenmicmaster.vercel.app/sitemap.xml\n', media_type='text/plain')
+
+    @app.get('/sitemap.xml')
+    async def sitemap():
+        return Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://nycstandupopenmicmaster.vercel.app/</loc></url><url><loc>https://nycstandupopenmicmaster.vercel.app/about</loc></url></urlset>', media_type='application/xml')
+
     @app.get('/admin')
     @app.get('/owner')
     @app.get('/claim')
     @app.get('/')
-    async def index():
-        return FileResponse(ROOT / 'assets' / 'index.html')
+    async def index(request: Request):
+        headers = {'X-Robots-Tag': 'noindex, nofollow'} if request.url.path != '/' else {}
+        return FileResponse(ROOT / 'assets' / 'index.html', headers=headers)
 
     app.mount('/assets', StaticFiles(directory=ROOT / 'assets'), name='assets')
     return app
