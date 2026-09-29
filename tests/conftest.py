@@ -1,6 +1,6 @@
 import os
 import uuid
-from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode, quote
 
 import pytest
 
@@ -20,7 +20,8 @@ def database(request, tmp_path):
     query = dict(parse_qsl(parts.query))
     query['options'] = '-c search_path=' + schema
     try:
-        yield urlunsplit(parts._replace(query=urlencode(query)))
+        # libpq URIs decode %20 for spaces, not form-encoding's plus sign.
+        yield urlunsplit(parts._replace(query=urlencode(query, quote_via=quote)))
     finally:
         with psycopg.connect(url, autocommit=True) as conn:
             conn.execute(sql.SQL('DROP SCHEMA {} CASCADE').format(sql.Identifier(schema)))
