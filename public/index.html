@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#245da7">
+  <meta name="description" content="Find NYC stand up open mics by day and borough on one simple map.">
+  <title>NYC Stand Up Open Mic Master</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/styles.css">
+  <script src="/assets/map.js" defer></script>
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to mics</a>
+<header class="topbar"><div class="nav-inner">
+  <a href="/" class="wordmark" aria-label="NYC Stand Up Open Mic Master home"><img src="/assets/favicon.svg" alt="" width="20" height="20"><span>NYC Stand Up Open Mic Master</span></a>
+  <a class="host-nav" href="/owner">Edit my mic</a>
+</div></header>
+<div id="preview-banner" class="preview-banner" hidden></div>
+<div class="status-strip" hidden><span id="directory-dot"></span><span id="directory-status"></span></div>
+<main id="main">
+<section id="view-directory">
+  <section id="listings" class="directory-section" aria-label="Open-mic listings">
+    <div class="directory-controls" role="search">
+      <input id="search" type="search" placeholder="Search mics or venues" aria-label="Search mics or venues" autocomplete="off">
+      <select id="day-filter" aria-label="Day"></select>
+      <select id="borough-filter" aria-label="Borough"><option value="all">All boroughs</option><option>Manhattan</option><option>Brooklyn</option><option>Queens</option><option>Bronx</option><option>Staten Island</option></select>
+      <button id="more-filters" class="compact-button" data-action="filters">Filters</button>
+    </div>
+    <div class="directory-layout">
+      <section class="map-panel" aria-label="NYC open mic map">
+        <div id="nyc-map" class="city-map" role="region" aria-label="Interactive NYC map; select pins or use the zoom buttons">
+          <div class="tile-plane"></div><div class="pin-plane"></div>
+          <div class="map-controls"><button type="button" data-map="in" aria-label="Zoom in">+</button><button type="button" data-map="out" aria-label="Zoom out">−</button><button type="button" class="map-reset" data-action="map-reset" aria-label="Show all NYC" title="Show all NYC">NYC</button></div>
+          <span class="map-offline" hidden>Map unavailable. Select a mic for its address.</span>
+          <div class="map-attribution">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></div>
+          <div class="map-popup" hidden></div>
+        </div>
+      </section>
+      <section class="results" aria-label="Matching mics">
+        <div class="results-toolbar"><p id="result-count" role="status" aria-live="polite"></p><div class="list-pagination" aria-label="Listing pages"><button class="compact-button" data-action="previous-page" aria-label="Previous page">‹</button><span id="page-count" aria-live="polite"></span><button class="compact-button" data-action="next-page" aria-label="Next page">›</button></div></div>
+        <div id="cards" class="mic-list"></div>
+      </section>
+    </div>
+  </section>
+</section>
+<section id="view-sources" class="wrap admin-section" hidden></section>
+</main>
+<dialog id="modal"><div id="modal-content"></div></dialog>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

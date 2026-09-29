@@ -1,0 +1,337 @@
+"""MIC LIST — one-instance web application with persistent storage and a sync worker."""
+import asyncio
+import contextlib
+import csv
+import hashlib
+import hmac
+import io
+import json
+import logging
+import os
+import secrets
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile, Depends
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
+
+from .fetcher import SafeFetcher, FetchError, MAX_BYTES, validate_url
+from .models import SourceConfig, SourceUpdate, PreviewCommit, Login, VisibilityUpdate
+from .parsers import extract, FIELDS
+from .store import Store, digest
+
+ROOT = Path(__file__).resolve().parent.parent
+log = logging.getLogger('miclist')
+
+
+def create_app(db_path=None):
+    database = db_path or os.getenv('DATABASE_PATH', str(ROOT / 'data' / 'miclist.sqlite3'))
+    store = Store(database)
+    fetcher = SafeFetcher()
+    local_dev = os.getenv('LOCAL_DEV', '0') == '1'
+    password = os.getenv('ADMIN_PASSWORD', '')
+    configured = bool(password)
+    weak_password = len(password) < 15
+    salt = secrets.token_bytes(24)
+    password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 600000) if configured else b''
+    revision = hashlib.sha256(password.encode()).hexdigest()
+    del password
+    scheduler_enabled = os.getenv('SCHEDULER_ENABLED', '1') == '1'
+
+    async def sync_one(source_id):
+        source = store.get_source(source_id)
+        if not source:
+            raise HTTPException(404, 'Source not found')
+        if source['config']['kind'] == 'upload':
+            raise HTTPException(400, 'This is an uploaded snapshot. Import a replacement file to change it, or use an online file URL for automatic syncing.')
+        if not store.acquire(source_id):
+            return {'state': 'busy', 'message': 'A check is already running.'}
+        try:
+            result = await fetcher.fetch(source['config']['url'], source['etag'], source['modified'])
+            validators = {'etag': result['headers'].get('Etag') or result['headers'].get('ETag'),
+                          'modified': result['headers'].get('Last-Modified')}
+            if result['status'] == 304:
+                # A 304 after a partially approved preview must not erase its review state.
+                if source['state'] == 'review':
+                    result = await fetcher.fetch(source['config']['url'])
+                else:
+                    return store.success(source_id, [], validators, unchanged=True)
+            content_hash = digest(result['content'])
+            validators['hash'] = content_hash
+            if content_hash == source['content_hash'] and source['state'] != 'review':
+                return store.success(source_id, [], validators, unchanged=True)
+            parsed = await asyncio.to_thread(extract, result['content'], SourceConfig(**source['config']), result['headers'].get('Content-Type', ''))
+            if not parsed['rows'] or parsed['skipped']:
+                message = f"Import needs review: {len(parsed['rows'])} valid, {parsed['skipped']} skipped. Existing listings kept. " + ' '.join(parsed['warnings'][:5])
+                store.failure(source_id, message, review=True)
+                return {'state': 'review', 'message': message}
+            return store.success(source_id, parsed['rows'], validators)
+        except (ValueError, OSError, asyncio.TimeoutError) as exc:
+            store.failure(source_id, str(exc))
+            return {'state': 'error', 'message': str(exc)}
+        except Exception:
+            log.exception('Source synchronization failed')
+            message = 'Unexpected import error. Existing listings were kept; check the server logs.'
+            store.failure(source_id, message)
+            return {'state': 'error', 'message': message}
+
+    async def worker():
+        while True:
+            try:
+                with store.connect() as c:
+                    c.execute("INSERT INTO meta(key,value) VALUES('worker_heartbeat',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(time.time()),))
+                due = [s for s in store.list_sources() if s['enabled'] and s['next_check'] <= time.time() and s['lease_until'] < time.time()]
+                for source in due:
+                    # Recheck enabled state immediately before starting network activity.
+                    current = store.get_source(source['id'])
+                    if current and current['enabled']:
+                        await sync_one(source['id'])
+                from .geocoding import geocode_pending
+                await geocode_pending(store)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception('Worker iteration failed')
+            await asyncio.sleep(30)
+
+    @asynccontextmanager
+    async def lifespan(app):
+        if configured and weak_password:
+            log.warning('The administrator password is short. Replace it before public launch.')
+        if not configured:
+            log.warning('Admin is locked. Set ADMIN_PASSWORD on the server to enable administration.')
+        task = asyncio.create_task(worker()) if scheduler_enabled else None
+        yield
+        if task:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    app = FastAPI(title='NYC Stand Up Open Mic Master', version='1.0.0', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app.state.store = store
+    app.state.fetcher = fetcher
+    app.state.sync_one = sync_one
+
+    @app.middleware('http')
+    async def security_headers(request, call_next):
+        if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+            if request.headers.get('x-requested-with') != 'MicList':
+                return JSONResponse({'detail': 'Missing same-origin request header.'}, status_code=403)
+            origin = request.headers.get('origin')
+            allowed = os.getenv('PUBLIC_ORIGIN', '').rstrip('/')
+            expected = str(request.base_url).rstrip('/')
+            if origin and origin.rstrip('/') not in ({allowed} if allowed else {expected}):
+                return JSONResponse({'detail': 'Cross-origin writes are not allowed.'}, status_code=403)
+            try:
+                content_length = int(request.headers.get('content-length', '0') or 0)
+            except ValueError:
+                return JSONResponse({'detail': 'Invalid request size.'}, status_code=400)
+            if content_length > MAX_BYTES + 100000:
+                return JSONResponse({'detail': 'Upload is too large (5 MB maximum).'}, status_code=413)
+        response = await call_next(request)
+        response.headers.update({
+            'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY',
+            'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+            'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        })
+        if request.url.path.startswith('/api/'):
+            response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    def admin(request: Request):
+        token = request.cookies.get('miclist_session', '')
+        with store.connect() as c:
+            session = c.execute('SELECT * FROM sessions WHERE token_hash=? AND expires>? AND revision=?',
+                                (hashlib.sha256(token.encode()).hexdigest(), time.time(), revision)).fetchone()
+        if not configured or not token or not session:
+            raise HTTPException(401, 'Sign in to manage your sources.')
+        return True
+
+    def check_config(config):
+        if not config.permission_confirmed:
+            raise HTTPException(400, 'Confirm that you may access and reuse this source before importing.')
+        if set(config.mapping) - set(FIELDS) or set(config.defaults) - set(FIELDS):
+            raise HTTPException(400, 'Unknown field in the column mapping or defaults.')
+        if len(config.mapping) > 20 or any(len(v) > 300 for v in config.mapping.values()):
+            raise HTTPException(400, 'Mapping is too large.')
+        if any(len(v) > 2000 for v in config.defaults.values()):
+            raise HTTPException(400, 'A default field value is too long.')
+
+    @app.get('/api/session')
+    async def session_info(request: Request):
+        try:
+            admin(request)
+            authenticated = True
+        except HTTPException:
+            authenticated = False
+        return {'authenticated': authenticated, 'configured': configured, 'weak_password': weak_password if authenticated else None}
+
+    @app.post('/api/login')
+    async def login(body: Login, request: Request, response: Response):
+        if not configured:
+            raise HTTPException(503, 'Set ADMIN_PASSWORD on the server before signing in.')
+        ip = hashlib.sha256((request.client.host if request.client else 'unknown').encode()).hexdigest()
+        now = time.time()
+        with store.connect() as c:
+            c.execute('DELETE FROM attempts WHERE created<?', (now - 900,))
+            count = c.execute('SELECT COUNT(*) FROM attempts WHERE ip_hash=?', (ip,)).fetchone()[0]
+            if count >= 8:
+                raise HTTPException(429, 'Too many attempts. Try again in 15 minutes.')
+            c.execute('INSERT INTO attempts VALUES (?,?)', (ip, now))
+        candidate = await asyncio.to_thread(hashlib.pbkdf2_hmac, 'sha256', body.password.encode(), salt, 600000)
+        if not hmac.compare_digest(candidate, password_hash):
+            raise HTTPException(401, 'Incorrect password.')
+        token = secrets.token_urlsafe(40)
+        with store.connect() as c:
+            c.execute('DELETE FROM sessions WHERE expires<? OR revision!=?', (now, revision))
+            c.execute('DELETE FROM attempts WHERE ip_hash=?', (ip,))
+            c.execute('INSERT INTO sessions VALUES (?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), now + 43200, revision))
+        response.set_cookie('miclist_session', token, max_age=43200, httponly=True, secure=not local_dev, samesite='strict', path='/')
+        return {'authenticated': True}
+
+    @app.post('/api/logout')
+    async def logout(request: Request, response: Response):
+        token = request.cookies.get('miclist_session', '')
+        with store.connect() as c:
+            c.execute('DELETE FROM sessions WHERE token_hash=?', (hashlib.sha256(token.encode()).hexdigest(),))
+        response.delete_cookie('miclist_session', path='/')
+        return {'authenticated': False}
+
+    @app.get('/api/health')
+    async def health():
+        with store.connect() as c:
+            heartbeat = c.execute("SELECT value FROM meta WHERE key='worker_heartbeat'").fetchone()
+        return {'status': 'ok', 'scheduler_enabled': scheduler_enabled, 'worker_heartbeat': float(heartbeat[0]) if heartbeat else None}
+
+    @app.get('/api/public')
+    async def public():
+        return store.public_data()
+
+    @app.get('/api/sources', dependencies=[Depends(admin)])
+    async def sources():
+        with store.connect() as c:
+            hb = c.execute("SELECT value FROM meta WHERE key='worker_heartbeat'").fetchone()
+        return {'sources': store.list_sources(), 'activity': store.activity(), 'review': store.review_rows(),
+                'scheduler_enabled': scheduler_enabled, 'heartbeat': float(hb[0]) if hb else None}
+
+    @app.post('/api/sources/preview', dependencies=[Depends(admin)])
+    async def preview(config: SourceConfig):
+        check_config(config)
+        if config.kind == 'upload':
+            raise HTTPException(400, 'Use the upload form for local files.')
+        try:
+            config.url = validate_url(config.url)
+            fetched = await fetcher.fetch(config.url)
+            parsed = await asyncio.to_thread(extract, fetched['content'], config, fetched['headers'].get('Content-Type', ''))
+            validators = {'etag': fetched['headers'].get('Etag') or fetched['headers'].get('ETag'),
+                          'modified': fetched['headers'].get('Last-Modified'), 'hash': digest(fetched['content'])}
+            # Store the original URL: it is revalidated and redirects are checked on every request.
+            preview_id = store.preview(config.model_dump(), parsed, validators=validators)
+            return {**parsed, 'preview_id': preview_id}
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.post('/api/sources/upload-preview', dependencies=[Depends(admin)])
+    async def upload_preview(file: UploadFile = File(...), config: str = Form(...)):
+        try:
+            source = SourceConfig.model_validate_json(config)
+            source.kind, source.url = 'upload', ''
+            check_config(source)
+            name = file.filename or ''
+            if not name.lower().endswith(('.csv', '.xlsx')):
+                raise ValueError('Upload a .csv or .xlsx file. Legacy .xls and macro files are not accepted.')
+            content = await file.read(MAX_BYTES + 1)
+            if len(content) > MAX_BYTES:
+                raise HTTPException(413, 'File exceeds the 5 MB limit.')
+            parsed = await asyncio.to_thread(extract, content, source, file.content_type or '', name)
+            preview_id = store.preview(source.model_dump(), parsed, content)
+            return {**parsed, 'preview_id': preview_id}
+        except (ValidationError, ValueError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        finally:
+            await file.close()
+
+    @app.post('/api/sources', dependencies=[Depends(admin)])
+    async def commit(body: PreviewCommit):
+        try:
+            return {'id': store.commit_preview(body.preview_id)}
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.patch('/api/sources/{source_id}', dependencies=[Depends(admin)])
+    async def update_source(source_id: str, body: SourceUpdate):
+        source = store.get_source(source_id)
+        if not source:
+            raise HTTPException(404, 'Source not found.')
+        changes = body.model_dump(exclude_none=True)
+        if 'enabled' in changes and source['config']['kind'] == 'upload':
+            raise HTTPException(400, 'Uploaded files are snapshots and cannot automatically refresh.')
+        for field in ('interval_minutes', 'priority'):
+            if field in changes:
+                source['config'][field] = changes[field]
+        enabled = changes.get('enabled', bool(source['enabled']))
+        with store.connect() as c:
+            c.execute('UPDATE sources SET enabled=?,config=?,next_check=? WHERE id=?',
+                      (int(enabled), json.dumps(source['config']), time.time() + source['config']['interval_minutes']*60, source_id))
+        return {'ok': True}
+
+    @app.post('/api/sources/{source_id}/sync', dependencies=[Depends(admin)])
+    async def sync(source_id: str):
+        return await sync_one(source_id)
+
+    @app.delete('/api/sources/{source_id}', dependencies=[Depends(admin)])
+    async def delete_source(source_id: str):
+        source = store.get_source(source_id)
+        if source and source['lease_until'] > time.time():
+            raise HTTPException(409, 'A source check is running. Remove it after that check finishes.')
+        with store.connect() as c:
+            c.execute('DELETE FROM sources WHERE id=?', (source_id,))
+        return {'ok': True}
+
+    @app.patch('/api/listings/{source_id}/{remote_key}/visibility', dependencies=[Depends(admin)])
+    async def visibility(source_id: str, remote_key: str, body: VisibilityUpdate):
+        with store.connect() as c:
+            result = c.execute('UPDATE observations SET hidden=? WHERE source_id=? AND remote_key=?',
+                               (int(body.hidden), source_id, remote_key))
+            if not result.rowcount:
+                raise HTTPException(404, 'Listing not found.')
+        return {'ok': True}
+
+    @app.get('/api/export', dependencies=[Depends(admin)])
+    async def export():
+        # Exports configurations and observations, never session tokens or passwords.
+        with store.connect() as c:
+            obs = [dict(r) for r in c.execute('SELECT * FROM observations')]
+        data = {'schema': 1, 'exported_at': time.time(), 'sources': store.list_sources(), 'observations': obs}
+        return Response(json.dumps(data, indent=2), media_type='application/json',
+                        headers={'Content-Disposition': 'attachment; filename="mic-list-backup.json"'})
+
+    @app.get('/api/export.csv')
+    async def export_csv():
+        output = io.StringIO(newline='')
+        writer = csv.writer(output)
+        fields = ['name', 'venue', 'address', 'borough', 'weekday', 'date', 'start_time', 'signup_time', 'cost_text', 'purchase_minimum', 'set_minutes', 'signup_method', 'signup_url', 'status']
+        writer.writerow(fields + ['sources', 'last_checked_utc'])
+        for row in store.public_data()['listings']:
+            values = [row.get(f, '') for f in fields] + [' | '.join(s['url'] for s in row['sources']), row['checked_at']]
+            # Prevent formula execution when an export is opened in a spreadsheet.
+            writer.writerow(["'"+str(v) if str(v).lstrip().startswith(('=', '+', '-', '@')) else v for v in values])
+        return Response(output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="nyc-open-mics.csv"'})
+
+    from .community import register
+    register(app, store, admin, local_dev)
+
+    @app.get('/admin')
+    @app.get('/owner')
+    @app.get('/claim')
+    @app.get('/')
+    async def index():
+        return FileResponse(ROOT / 'public' / 'index.html')
+
+    app.mount('/assets', StaticFiles(directory=ROOT / 'public'), name='assets')
+    return app
+
+app = create_app()
