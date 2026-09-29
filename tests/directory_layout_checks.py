@@ -18,6 +18,7 @@ with sync_playwright() as p:
     page.route('https://tile.openstreetmap.org/**', lambda route: route.abort())
     page.set_content((ROOT / 'preview.html').read_text(), wait_until='domcontentloaded')
     page.locator('#day-filter').select_option('all')
+    page.evaluate('state.data.listings[0].claimed=true;renderDirectory()')
     results = []
     for width, height in [(1440,900), (1024,768), (768,1024), (390,844), (360,640), (320,568), (320,400), (844,390), (568,320)]:
         page.set_viewport_size({'width':width,'height':height})
@@ -30,6 +31,7 @@ with sync_playwright() as p:
                 lastFits:!last||last.bottom<=bounds.bottom+1,mapHeight:map.clientHeight,mapWidth:map.clientWidth,
                 controlsVisible:[...document.querySelectorAll('.directory-controls > *')].every(el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;})};
         }''')
+        assert page.locator('#cards .claim-status').count()==metrics['rows']
         assert metrics['bodyWidth'] <= width, metrics
         assert metrics['bodyHeight'] <= height, metrics
         assert metrics['listContentHeight'] <= metrics['listHeight']+1, metrics
@@ -57,6 +59,9 @@ with sync_playwright() as p:
         page.locator('[data-action="next-page"]').click()
     assert len(seen)==21 and len(set(seen))==21, seen
     assert page.evaluate('map.rows.length')==21
+    page.evaluate('details(state.data.listings[0].id)')
+    assert 'Host claimed' in page.locator('.detail-grid').inner_text()
+    page.get_by_role('button', name='Close dialog').click()
     page.locator('#borough-filter').select_option('Brooklyn')
     assert page.evaluate('state.page')==0
     assert all('Brooklyn' in text for text in page.locator('.venue-line').all_text_contents())
