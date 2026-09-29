@@ -110,3 +110,6 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 /* The center of a venue dot is its coordinate, not the top of an offset pin. */
 .mic-pin{width:24px;height:24px;border-radius:50%;transform:translate(-50%,-50%);padding:0}
 .mic-pin.mic-cluster{width:30px;height:30px;background:#fff;color:#245da7;border:2px dashed #245da7;font-weight:bold}
+
+#cards .card-main{grid-template-columns:53px minmax(0,1fr) 40px}
+.filter-options input[type=time]{min-width:0;width:100%;padding:5px;font:12px var(--sans)}
