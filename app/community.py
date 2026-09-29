@@ -150,7 +150,7 @@ def register(app, store, admin, local_dev):
         response.set_cookie('miclist_owner', token, max_age=43200, httponly=True, secure=not local_dev, samesite='strict', path='/')
 
     def normalize_edit(existing, fields):
-        allowed = set(FIELDS)-{'external_id'}
+        allowed = set(FIELDS)-{'external_id','display_name'}
         if set(fields)-allowed:
             raise HTTPException(400, 'Some fields cannot be edited.')
         if any(isinstance(v, (dict, list)) or len(str(v))>3000 for v in fields.values()):

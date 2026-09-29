@@ -291,6 +291,14 @@ class Store:
                 continue
             curated = overlays.get(mic_id)
             values = {**chosen, **(json.loads(curated['payload']) if curated else {})}
+            patch = json.loads(curated['payload']) if curated else {}
+            # Keep imported mic names and public host links when another source only
+            # supplies a generic event label. Explicit owner edits take precedence.
+            for field in ('host_names', 'host_socials'):
+                if field not in patch and not values.get(field):
+                    values[field] = next((p.get(field) for _, p, _ in items if p.get(field)), '')
+            if 'name' not in patch:
+                values['name'] = next((p['display_name'] for _, p, _ in items if p.get('display_name')), values['name'])
             from .geocoding import address_key
             geo = locations.get(address_key(values))
             map_status = 'source' if values.get('latitude') is not None else 'unmapped'

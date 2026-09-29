@@ -122,6 +122,24 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 
 #cards .card-main{grid-template-columns:53px minmax(0,1fr) 40px}
 .filter-options input[type=time]{min-width:0;width:100%;padding:5px;font:12px var(--sans)}
+
+/* Keep all row content inside its grid cell, including long venue names. */
+#cards .card-main,#cards .mic-info,#cards .mic-heading,#cards .mic-meta{min-width:0;max-width:100%}
+#cards .mic-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow-wrap:anywhere;line-height:13px;max-height:26px;overflow:hidden}
+#cards .mic-meta{display:flex;align-items:center;gap:4px}
+#cards .mic-meta .venue-line{flex:1;min-width:0;width:auto}
+#cards .mic-cost{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+.site-menu{position:relative;flex:none}.site-menu summary{list-style:none;cursor:pointer;color:white;font-size:22px;line-height:26px;padding:0 5px}.site-menu summary::-webkit-details-marker{display:none}
+.site-menu nav{position:absolute;right:0;top:calc(100% + 6px);width:145px;padding:3px;background:#f5f4ed;border:1px solid #8799ae;box-shadow:2px 3px 5px #0003;z-index:30}
+.site-menu nav a,.site-menu nav button{display:block;width:100%;border:0;background:none;text-align:left;padding:8px;color:#20334a;font:12px var(--sans)}
+.site-menu nav a:hover,.site-menu nav button:hover{background:#dce9f8}.donation-options{display:flex;gap:10px;margin:16px 0}
+
+#cards{--row-height:66px}#cards .card-main{padding:3px 6px}
+.row-updated{display:block;font:9px/12px var(--sans);color:#657080;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail-updated{font:9px var(--sans);margin-right:auto}.detail-tabs{gap:3px}.detail-tabs .compact-button{padding:3px 6px;font-size:11px}
+.host-links{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}.host-links a{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+
+.site-menu{margin:0;padding:0;border:0}.site-menu summary{margin:0}
 </style>
   
   
@@ -130,7 +148,7 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 <a class="skip-link" href="#main">Skip to mics</a>
 <header class="topbar"><div class="nav-inner">
   <a href="/" class="wordmark" aria-label="NYC Stand Up Open Mic Master home"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20128%20128%22%3E%0A%3Ctitle%3ENYC%20Stand%20Up%20Open%20Mic%20Master%20map%20pin%20and%20microphone%3C/title%3E%0A%3Cpath%20fill%3D%22%232564B3%22%20d%3D%22M64%208C38%208%2020%2027%2020%2051c0%2030%2027%2055%2044%2073%2017-18%2044-43%2044-73C108%2027%2090%208%2064%208Z%22/%3E%0A%3Ccircle%20fill%3D%22%23FFFFFF%22%20cx%3D%2264%22%20cy%3D%2251%22%20r%3D%2220%22/%3E%0A%3Cpath%20fill%3D%22%23163A66%22%20d%3D%22M60%2038h8v20h-8zM53%2054h4c0%205%203%208%207%208s7-3%207-8h4c0%207-4%2012-9%2013v6h-4v-6c-5-1-9-6-9-13Z%22/%3E%0A%3C/svg%3E%0A" alt="" width="20" height="20"><span>NYC Stand Up Open Mic Master</span></a>
-  <a class="host-nav" href="/owner">Edit my mic</a>
+  <details class="site-menu" id="site-menu"><summary aria-label="Open menu"><span aria-hidden="true">☰</span></summary><nav aria-label="Site menu"><a href="/owner">Host sign in</a><button data-action="about">About</button><button data-action="donate">Donate</button></nav></details>
 </div></header>
 <div id="preview-banner" class="preview-banner" hidden></div>
 <div class="status-strip" hidden><span id="directory-dot"></span><span id="directory-status"></span></div>
@@ -319,7 +337,9 @@ function nextDate(row){
   return '9999-12-31';
 }
 const claimBadge=r=>`<span class="claim-status ${r.claimed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':'No approved host has claimed this mic.'}">${r.claimed?'Host claimed':'Unclaimed'}</span>`;
-const micTitle=r=>/^open[ -]?mic$/i.test(r.name.trim())?r.venue:r.name;
+const micTitle=r=>r.name;
+const updatedAt=r=>Math.max(r.updated_at||0,r.curated_at||0);
+const updatedText=r=>updatedAt(r)?new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}).format(new Date(updatedAt(r)*1000)):'not recorded';
 const micLink=id=>new URL('/?mic='+encodeURIComponent(id),location.origin==='null'?'https://nycstandupopenmicmaster.vercel.app':location.origin).href;
 function withinTime(time,from,to){if(!from&&!to)return true;if(!time)return false;return from&&to&&from>to?time>=from||time<=to:(!from||time>=from)&&(!to||time<=to);}
 function filtered(){return state.data.listings.filter(r=>{
@@ -361,8 +381,8 @@ function renderCards(){
 function card(r){
   const cost=r.cost===0?'Free':r.cost!=null?`$${r.cost}`:r.cost_text?'See fee':'—';
   const located=r.status==='scheduled'&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);
-  const title=micTitle(r),venue=`${title===r.venue?(r.neighborhood||r.borough):r.venue} · ${title===r.venue?r.address:r.borough}`;
-  return `<article class="mic-card" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):r.date?esc(dateText(r.date)):esc(DAYS[r.weekday]?.slice(0,3)||'TBD')}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button>${claimBadge(r)}</div>${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}</div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
+  const title=micTitle(r),venue=`${r.venue} · ${r.borough}`;
+  return `<article class="mic-card" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):r.date?esc(dateText(r.date)):esc(DAYS[r.weekday]?.slice(0,3)||'TBD')}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button></div><div class="mic-meta">${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}${claimBadge(r)}</div><small class="row-updated" title="${updatedAt(r)?esc(new Date(updatedAt(r)*1000).toLocaleString()):'Not recorded'}">Updated ${esc(updatedText(r))}</small></div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
 }
 function filtersDialog(){
   const option=(v,t,current)=>`<option value="${v}" ${current===v?'selected':''}>${t}</option>`;
@@ -372,10 +392,13 @@ function findMic(id){return state.data.listings.find(r=>r.id===id)||state.commun
 function details(id,tab='mic',page=0){
   const r=findMic(id);if(!r)return;
   const item=(label,value)=>`<div class="detail-item"><small>${label}</small><strong>${esc(value)}</strong></div>`;
-  const tabs=['mic','notes','sources','link'].map(t=>`<button class="compact-button ${tab===t?'active':''}" data-action="detail-tab" data-id="${esc(id)}" data-tab="${t}" aria-pressed="${tab===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
+  const tabs=['mic','hosts','notes','sources','link'].map(t=>`<button class="compact-button ${tab===t?'active':''}" data-action="detail-tab" data-id="${esc(id)}" data-tab="${t}" aria-pressed="${tab===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
   let body='';
   if(tab==='mic'){
-    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('WHEN',`${r.date?dateText(r.date):DAYS[r.weekday]} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('METHOD',r.signup_method||'Not listed')}${item('STATUS',r.status+' · '+(r.claimed?'Host claimed':'Unclaimed'))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?badslava\.com\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
+    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('WHEN',`${r.date?dateText(r.date):DAYS[r.weekday]} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('STATUS',r.status+' · '+(r.claimed?'Host claimed':'Unclaimed'))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?(badslava\.com|comediq\.us)\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
+  }else if(tab==='hosts'){
+    const links=String(r.host_socials||'').split(/\s+/).filter(Boolean);
+    body=`<p>${esc(r.host_names||'Host not listed')}</p><div class="host-links">${links.map(u=>external(u,new URL(safeUrl(u)||'https://example.com').hostname.replace('www.',''),'button quiet')).join('')}</div><p class="form-helper">${r.claimed?'An approved host can update these details.':'Host details are from the source unless a host claims this mic.'}</p>`;
   }else if(tab==='link'){
     body=`<label for="mic-link">Link to this mic</label><input class="input-full" id="mic-link" readonly value="${esc(micLink(id))}"><div class="detail-actions">${button('Copy link','copy-mic-link',id)}</div>`;
   }else{
@@ -388,7 +411,7 @@ function details(id,tab='mic',page=0){
     page=Math.max(0,Math.min(page,parts.length-1));const part=parts[page];
     body=`<p class="text-page">${esc(part.text)}</p>${part.source?.url?external(part.source.url,'Open source','text-link'):''}${tab==='sources'?'<p class="form-helper">Check the original listing before going.</p>':''}${parts.length>1?`<div class="detail-pages"><button class="compact-button" data-action="detail-tab" data-id="${esc(id)}" data-tab="${tab}" data-page="${page-1}" ${page===0?'disabled':''}>‹ Previous</button><span>${page+1}/${parts.length}</span><button class="compact-button" data-action="detail-tab" data-id="${esc(id)}" data-tab="${tab}" data-page="${page+1}" ${page===parts.length-1?'disabled':''}>Next ›</button></div>`:''}`;
   }
-  modal(micTitle(r),`<div class="detail-tabs">${tabs}</div><div class="detail-panel">${body}</div>`,button('Submit a fix','submit-fix',id)+button(r.claimed?'Host / claim help':'Claim this mic','submit-claim',id));
+  modal(micTitle(r),`<div class="detail-tabs">${tabs}</div><div class="detail-panel">${body}</div>`,`<small class="detail-updated">Updated ${esc(updatedText(r))}</small>`+button('Submit a fix','submit-fix',id)+button(r.claimed?'Host / claim help':'Claim this mic','submit-claim',id));
   $('#modal').dataset.view='mic';$('#modal .modal-head h2').title=micTitle(r);
 }
 function submission(id,kind){if(state.demo){toast('These are fictional examples. Connect a real source before submitting fixes or claims.');return;}const r=findMic(id);if(!r)return;if(kind==='claim'&&r.claimed){modal('This mic has a host.',`<p>The host can sign in to edit this listing. For ownership disputes or corrections, submit a fix for the administrator.</p><a class="button primary" href="/owner">Host login ↗</a>`,button('Submit a fix','submit-fix',id));return;}
@@ -425,7 +448,7 @@ function renderAdminBody(){const root=$('#admin-body'),a=state.admin,c=state.com
 }
 function renderAdminMics(q){const rows=state.community.listings.filter(r=>`${r.name} ${r.venue} ${r.borough}`.toLowerCase().includes(q));$('#admin-mic-rows').innerHTML=rows.length?rows.map(r=>`<article class="queue-item"><div class="queue-heading"><div><h3>${esc(r.name)}</h3><small>${esc(r.venue)} · ${esc(r.borough)} · ${esc(r.date||DAYS[r.weekday])} ${esc(timeText(r.start_time))}</small></div><span class="tag">${r.hidden?'Hidden':'Published'}</span></div><p>${r.claimed?'Host claimed · ':''}${r.curated?'Edited values protected from scraping · ':''}${!Number.isFinite(r.latitude)?'Location needs a map pin':'Location mapped'}</p><div class="queue-buttons">${button('Edit mic / pin','edit-admin',r.id,'primary')}${button(r.hidden?'Publish':'Hide from directory','mic-hide',r.id)}${r.curated?button('Restore source values','mic-restore',r.id):''}</div></article>`).join(''):blank('No listings yet.','Import a source or add a mic manually.');}
 function editForm(id,mode){const r=id?findMic(id):{};if(id&&!r){toast('This mic is no longer available.');return;}
-  modal(id?'Edit the mic.':'Add a mic.',`<p>${mode==='owner'?'You can edit only mics approved for your account. Your edits take priority over imports.':'Changes are saved over the source data. Unchanged fields continue syncing.'}</p><form id="edit-form" data-id="${esc(id||'')}" data-mode="${mode}"><div class="form-row">${field('Mic name','name',r.name||'','text',true)}${field('Venue','venue',r.venue||'','text',true)}</div>${field('Street address','address',r.address||'','text',true)}<div class="form-row">${selectField('Borough','borough',BOROUGHS,r.borough||'Manhattan')}${field('Neighborhood (optional)','neighborhood',r.neighborhood||'')}</div><div class="form-row">${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),r.weekday??0)}${field('One-time date (overrides weekly day)','date',r.date||'','date')}</div><div class="form-row">${field('Start time','start_time',r.start_time||'19:00','time',true)}${field('Signup time (optional)','signup_time',r.signup_time||'','time')}</div><div class="form-row">${field('Entry fee (Free, $5, or descriptive)','cost',r.cost_text||'')}${field('Purchase minimum (optional)','purchase_minimum',r.purchase_minimum||'')}</div><div class="form-row">${field('Minutes per comic','set_minutes',r.set_minutes||'','number')}${field('Signup method','signup_method',r.signup_method||'')}</div>${field('Signup link','signup_url',r.signup_url||'','url')}${selectField('Status','status',['scheduled','cancelled','postponed'],r.status||'scheduled')}${field('Excluded dates, comma-separated YYYY-MM-DD','excluded_dates',(r.excluded_dates||[]).join(', '))}${textField('Notes','notes',r.notes||'')}<details><summary>Map pin coordinates</summary><p class="form-helper">Use accurate coordinates for this venue. Leave both blank to request address geocoding. Approximate geocoder matches are labeled on the directory.</p><div class="form-row">${field('Latitude','latitude',r.latitude??'','number')}${field('Longitude','longitude',r.longitude??'','number')}</div></details><button type="submit" class="button primary">Save mic ↗</button></form>`);
+  modal(id?'Edit the mic.':'Add a mic.',`<p>${mode==='owner'?'You can edit only mics approved for your account. Your edits take priority over imports.':'Changes are saved over the source data. Unchanged fields continue syncing.'}</p><form id="edit-form" data-id="${esc(id||'')}" data-mode="${mode}"><div class="form-row">${field('Mic name','name',r.name||'','text',true)}${field('Venue','venue',r.venue||'','text',true)}</div>${field('Street address','address',r.address||'','text',true)}<div class="form-row">${selectField('Borough','borough',BOROUGHS,r.borough||'Manhattan')}${field('Neighborhood (optional)','neighborhood',r.neighborhood||'')}</div><div class="form-row">${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),r.weekday??0)}${field('One-time date (overrides weekly day)','date',r.date||'','date')}</div><div class="form-row">${field('Start time','start_time',r.start_time||'19:00','time',true)}${field('Signup time (optional)','signup_time',r.signup_time||'','time')}</div><div class="form-row">${field('Entry fee (Free, $5, or descriptive)','cost',r.cost_text||'')}${field('Purchase minimum (optional)','purchase_minimum',r.purchase_minimum||'')}</div><div class="form-row">${field('Minutes per comic','set_minutes',r.set_minutes||'','number')}${field('Signup method','signup_method',r.signup_method||'')}</div>${field('Host name(s), public','host_names',r.host_names||'')}${textField('Host social links (optional, up to 5 URLs)','host_socials',r.host_socials||'')}${field('Signup link','signup_url',r.signup_url||'','url')}${selectField('Status','status',['scheduled','cancelled','postponed'],r.status||'scheduled')}${field('Excluded dates, comma-separated YYYY-MM-DD','excluded_dates',(r.excluded_dates||[]).join(', '))}${textField('Notes','notes',r.notes||'')}<details><summary>Map pin coordinates</summary><p class="form-helper">Use accurate coordinates for this venue. Leave both blank to request address geocoding. Approximate geocoder matches are labeled on the directory.</p><div class="form-row">${field('Latitude','latitude',r.latitude??'','number')}${field('Longitude','longitude',r.longitude??'','number')}</div></details><button type="submit" class="button primary">Save mic ↗</button></form>`);
   $('#edit-form').dataset.original=JSON.stringify(Object.fromEntries(new FormData($('#edit-form'))));
 }
 async function renderOwner(){
@@ -465,6 +488,7 @@ document.addEventListener('submit',async e=>{
   }catch(err){errorAt(f,err);}finally{b.disabled=false;b.textContent=old;}
 });
 document.addEventListener('click',async e=>{
+  const menu=$('#site-menu');if(menu&&(!menu.contains(e.target)||e.target.closest('nav')))menu.open=false;
   if(window.MICLIST_PREVIEW){const link=e.target.closest('a[href]');if(link&&['/admin','/owner','/'].includes(link.getAttribute('href'))){e.preventDefault();if(link.getAttribute('href')==='/admin'){await renderAdmin();}else if(link.getAttribute('href')==='/owner'){await renderOwner();}else{$('#view-directory').hidden=false;$('#view-sources').hidden=true;renderDirectory();}return;}}
   const day=e.target.closest('[data-day]');if(day){state.day=day.dataset.day==='all'?'all':Number(day.dataset.day);renderDirectory();return;}
   const borough=e.target.closest('[data-borough]');if(borough){state.borough=borough.dataset.borough;renderDirectory();return;}
@@ -473,6 +497,9 @@ document.addEventListener('click',async e=>{
   try{
     if(action==='close')$('#modal').close();
     if(action==='how')how();
+    if(action==='about'){modal('About','<p>Find NYC stand up open mics by day, time, and borough. Only approved mic hosts can sign in to edit their listings.</p><p>Check the source or venue before heading out.</p>');}
+    if(action==='donate'){modal('Donate','<p>Support NYC Stand Up Open Mic Master.</p><div class="donation-options"><button class="button quiet" disabled>Cash App</button><button class="button quiet" disabled>Venmo</button></div><p class="form-helper">Donation links coming soon.</p>');}
+
     if(action==='refresh'){await loadPublic();toast('Loaded the latest saved listings.');}
     if(action==='reset'){Object.assign(state,{day:'all',borough:'all',search:'',cost:'all',signup:'all',timeFrom:'',timeTo:''});$('#search').value='';if($('#cost'))$('#cost').value='all';if($('#signup-filter'))$('#signup-filter').value='all';if($('#time-from'))$('#time-from').value='';if($('#time-to'))$('#time-to').value='';renderDirectory();}
     if(action==='filters')filtersDialog();
@@ -528,7 +555,7 @@ document.addEventListener('change',async e=>{const t=e.target;try{
   if(t.dataset.sourcePriority){await api(`/api/sources/${t.dataset.sourcePriority}`,{method:'PATCH',body:{priority:Number(t.value)}});toast('Source priority updated.');await loadPublic();await renderAdmin();}
 }catch(err){toast(err.message);}});
 document.addEventListener('input',e=>{if(e.target.id==='search'){state.search=e.target.value.toLowerCase().trim();renderDirectory();}if(e.target.id==='admin-search')renderAdminMics(e.target.value.toLowerCase().trim());});
-document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!$('#modal').open&&location.pathname==='/'){e.preventDefault();$('#search').focus();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#site-menu'))$('#site-menu').open=false;if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!$('#modal').open&&location.pathname==='/'){e.preventDefault();$('#search').focus();}});
 $('#modal').addEventListener('click',e=>{if(e.target===$('#modal'))$('#modal').close();});
 async function boot(){
   if(location.pathname==='/admin'||location.hash==='#sources'){await renderAdmin();}

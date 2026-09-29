@@ -63,10 +63,12 @@ def test_complete_claim_revoke_flow(clients):
     assert h.post('/api/owner/redeem',json={'token':token,'password':'a long correct horse battery'}).status_code==200
     assert h.post('/api/owner/redeem',json={'token':token,'password':'a long correct horse battery'}).status_code==400
     assert h.patch('/api/owner/mics/'+other['id'],json={'fields':{'start_time':'21:00'}}).status_code==403
-    assert h.patch('/api/owner/mics/'+mic['id'],json={'fields':{'start_time':'21:00'}}).status_code==200
+    assert h.patch('/api/owner/mics/'+mic['id'],json={'fields':{'start_time':'21:00','host_names':'Taylor','host_socials':'https://instagram.com/example'}}).status_code==200
     row=next(r for r in v.get('/api/public').json()['listings'] if r['id']==mic['id'])
     assert row['start_time']=='21:00' and row['claimed'] and row['host_confirmed_at']
     assert row['signup_time'] is None
+    assert row['host_names']=='Taylor' and row['host_socials']=='https://instagram.com/example'
+    assert h.patch('/api/owner/mics/'+mic['id'],json={'fields':{'host_socials':'javascript:alert(1)'}}).status_code==400
     assert a.delete('/api/admin/mics/'+mic['id']+'/owner').status_code==200
     assert h.patch('/api/owner/mics/'+mic['id'],json={'fields':{'start_time':'22:00'}}).status_code==401
     assert h.post('/api/owner/login',json={'email':'host@example.com','password':'a long correct horse battery'}).status_code==401
