@@ -3,7 +3,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 root = Path(__file__).resolve().parents[1]
-public = root / 'public'
+public = root / 'assets'
 html = (public / 'index.html').read_text()
 html = html.replace('<link rel="stylesheet" href="/assets/styles.css">', '<style>' + (public / 'styles.css').read_text() + '</style>')
 for asset in ('map.js', 'app.js'):

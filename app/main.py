@@ -1,4 +1,4 @@
-"""MIC LIST — one-instance web application with persistent storage and a sync worker."""
+"""NYC open-mic directory with persistent storage and scheduled source checks."""
 import asyncio
 import contextlib
 import csv
@@ -28,10 +28,14 @@ log = logging.getLogger('miclist')
 
 
 def create_app(db_path=None):
-    database = db_path or os.getenv('DATABASE_PATH', str(ROOT / 'data' / 'miclist.sqlite3'))
+    on_vercel = os.getenv('VERCEL') == '1'
+    database = db_path or os.getenv('DATABASE_URL') or os.getenv('POSTGRES_URL') or (
+        '' if on_vercel else os.getenv('DATABASE_PATH', str(ROOT / 'data' / 'miclist.sqlite3')))
+    if on_vercel and database and not str(database).startswith(('postgres://', 'postgresql://')):
+        raise RuntimeError('Vercel requires a PostgreSQL DATABASE_URL; local database files are not durable.')
     store = Store(database)
     fetcher = SafeFetcher()
-    local_dev = os.getenv('LOCAL_DEV', '0') == '1'
+    local_dev = not on_vercel and os.getenv('LOCAL_DEV', '0') == '1'
     password = os.getenv('ADMIN_PASSWORD', '')
     configured = bool(password)
     weak_password = len(password) < 15
@@ -39,7 +43,8 @@ def create_app(db_path=None):
     password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 600000) if configured else b''
     revision = hashlib.sha256(password.encode()).hexdigest()
     del password
-    scheduler_enabled = os.getenv('SCHEDULER_ENABLED', '1') == '1'
+    background_worker = not on_vercel and os.getenv('SCHEDULER_ENABLED', '1') == '1'
+    scheduler_enabled = background_worker or os.getenv('GITHUB_SYNC_ENABLED') == '1' or len(os.getenv('CRON_SECRET', '')) >= 32
 
     async def sync_one(source_id):
         source = store.get_source(source_id)
@@ -81,16 +86,8 @@ def create_app(db_path=None):
     async def worker():
         while True:
             try:
-                with store.connect() as c:
-                    c.execute("INSERT INTO meta(key,value) VALUES('worker_heartbeat',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(time.time()),))
-                due = [s for s in store.list_sources() if s['enabled'] and s['next_check'] <= time.time() and s['lease_until'] < time.time()]
-                for source in due:
-                    # Recheck enabled state immediately before starting network activity.
-                    current = store.get_source(source['id'])
-                    if current and current['enabled']:
-                        await sync_one(source['id'])
-                from .geocoding import geocode_pending
-                await geocode_pending(store)
+                from .scheduling import run_due
+                await run_due(store, sync_one)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -103,7 +100,7 @@ def create_app(db_path=None):
             log.warning('The administrator password is short. Replace it before public launch.')
         if not configured:
             log.warning('Admin is locked. Set ADMIN_PASSWORD on the server to enable administration.')
-        task = asyncio.create_task(worker()) if scheduler_enabled else None
+        task = asyncio.create_task(worker()) if background_worker else None
         yield
         if task:
             task.cancel()
@@ -176,6 +173,7 @@ def create_app(db_path=None):
         ip = hashlib.sha256((request.client.host if request.client else 'unknown').encode()).hexdigest()
         now = time.time()
         with store.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
             c.execute('DELETE FROM attempts WHERE created<?', (now - 900,))
             count = c.execute('SELECT COUNT(*) FROM attempts WHERE ip_hash=?', (ip,)).fetchone()[0]
             if count >= 8:
@@ -204,7 +202,14 @@ def create_app(db_path=None):
     async def health():
         with store.connect() as c:
             heartbeat = c.execute("SELECT value FROM meta WHERE key='worker_heartbeat'").fetchone()
-        return {'status': 'ok', 'scheduler_enabled': scheduler_enabled, 'worker_heartbeat': float(heartbeat[0]) if heartbeat else None}
+        return {'status': 'ok', 'storage': 'postgresql' if store.postgres else 'sqlite',
+                'scheduler_enabled': scheduler_enabled, 'worker_heartbeat': float(heartbeat[0]) if heartbeat else None}
+
+    @app.get('/api/cron/sync')
+    async def scheduled_sync(request: Request):
+        from .scheduling import authorize, run_due
+        await asyncio.to_thread(authorize, request.headers.get('authorization', ''))
+        return await run_due(store, sync_one)
 
     @app.get('/api/public')
     async def public():
@@ -215,7 +220,8 @@ def create_app(db_path=None):
         with store.connect() as c:
             hb = c.execute("SELECT value FROM meta WHERE key='worker_heartbeat'").fetchone()
         return {'sources': store.list_sources(), 'activity': store.activity(), 'review': store.review_rows(),
-                'scheduler_enabled': scheduler_enabled, 'heartbeat': float(hb[0]) if hb else None}
+                'scheduler_enabled': scheduler_enabled, 'heartbeat_max_age': 240 if background_worker else 2700,
+                'heartbeat': float(hb[0]) if hb else None}
 
     @app.post('/api/sources/preview', dependencies=[Depends(admin)])
     async def preview(config: SourceConfig):
@@ -329,9 +335,9 @@ def create_app(db_path=None):
     @app.get('/claim')
     @app.get('/')
     async def index():
-        return FileResponse(ROOT / 'public' / 'index.html')
+        return FileResponse(ROOT / 'assets' / 'index.html')
 
-    app.mount('/assets', StaticFiles(directory=ROOT / 'public'), name='assets')
+    app.mount('/assets', StaticFiles(directory=ROOT / 'assets'), name='assets')
     return app
 
 app = create_app()

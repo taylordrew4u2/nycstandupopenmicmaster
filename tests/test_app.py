@@ -19,8 +19,8 @@ from app.parsers import extract, parse_time, parse_days
 HEADERS={'X-Requested-With':'MicList'}
 
 @pytest.fixture
-def clients(tmp_path):
-    app=create_app(str(tmp_path/'test.sqlite3'))
+def clients(database):
+    app=create_app(database)
     with TestClient(app,headers=HEADERS) as admin, TestClient(app,headers=HEADERS) as visitor, TestClient(app,headers=HEADERS) as host:
         assert admin.post('/api/login',json={'password':TEST_ADMIN_PASSWORD}).status_code==200
         yield app,admin,visitor,host

@@ -3,17 +3,10 @@
 A working, self-hosted open-mic directory with a source manager, automatic polling,
 a five-borough map, public corrections, moderated claims, and scoped host accounts.
 
-**Delivery status:** application code and local/in-process tests are complete for this
-first version. No public deployment has been created. No real mic sources have been
-connected. The standalone preview contains explicitly fictional listings.
-
-## Hosting status
-
-This repository is ready for a persistent Python/Docker host. The full app currently
-uses SQLite on a persistent disk and a running background process for source polling.
-It is not yet configured as a Vercel deployment. Vercel hosting would require a
-persistent external database and scheduled source-check jobs, or a separately hosted
-backend. See [Vercel's SQLite guidance](https://vercel.com/kb/guide/is-sqlite-supported-in-vercel).
+**Hosting status:** the app is configured for Vercel with hosted PostgreSQL and
+scheduled source checks. A public deployment and database still need to be connected;
+the Vercel sign-in step has not been completed. No real mic sources are connected.
+The standalone preview contains explicitly fictional listings.
 
 ## Start on your Mac
 
@@ -142,35 +135,58 @@ clears its old coordinates unless replacement coordinates are explicitly supplie
 The geocoder uses a fixed government endpoint, not arbitrary user-provided URLs. It
 sends venue street addresses and boroughs, never claim evidence or contact information.
 
-## Deploy publicly
+## Deploy to Vercel
 
-This app requires **an always-on Python web service with a persistent disk**. Its
-SQLite database and background worker are not suited to an ephemeral serverless-only
-filesystem. Run one application instance / one Uvicorn worker for this first version.
+The FastAPI entrypoint is `app/main.py`. `vercel.json` uses a 300-second function
+limit. Static assets are served from `/assets`; the app never writes a database to
+Vercel's temporary filesystem. Database initialization is deferred until the first
+request, so builds do not require a working database connection.
 
-Included deployment files:
+1. Link this repository to a Vercel project.
+2. Connect a hosted PostgreSQL database (for example, Neon through Vercel Marketplace).
+   Set the pooled connection URL as **DATABASE_URL** in the production environment.
+   Use the provider's TLS-enabled URL; never commit it. `POSTGRES_URL` is also supported.
+3. Set **ADMIN_PASSWORD** to a unique password of at least 15 characters and
+   **LOCAL_DEV=0**. Set **PUBLIC_ORIGIN** to the actual production HTTPS origin.
+4. Set **GITHUB_SYNC_ENABLED=1**. Deploy and verify `/api/health` reports
+   `storage: postgresql` before connecting real sources.
+5. Put the verified production origin in `deployment.json` and commit it. The included
+   **Check mic sources** GitHub Actions workflow calls `/api/cron/sync` on a 15-minute
+   schedule. Until that URL is configured, the workflow deliberately makes no request.
+6. Run the workflow manually and check the source heartbeat in `/admin`.
 
-- `Dockerfile`: deployable service definition.
-- `compose.yaml`: local Docker alternative (`docker compose up --build`).
-- `render.yaml`: optional hosting blueprint, not a completed deployment. Verify the
-  service/disk plan and charges before approving any hosting resources.
-- `.env.example`: server configuration reference, not a public asset.
+Scheduled requests use short-lived GitHub OIDC tokens. The server validates the issuer,
+audience, immutable repository/owner IDs, main branch, exact workflow, event and expiry.
+A fork or another workflow cannot trigger imports. No administrator password or long-lived
+site credential is stored in GitHub Actions. The scheduler has no access to host accounts.
 
-For production, set `ADMIN_PASSWORD` to a long unique password, `LOCAL_DEV=0`,
-`PUBLIC_ORIGIN=https://your-actual-domain`, and a persistent `DATABASE_PATH`.
-Keep `SCHEDULER_ENABLED=1` and serve behind HTTPS. Secure cookies require HTTPS.
-Configure `TRUSTED_PROXY_IPS` only for your actual reverse proxy so rate limits use
-valid client addresses. Do not blindly trust forwarding headers on a directly exposed server.
+GitHub schedules can be delayed and are automatically disabled in public repositories
+after 60 days without repository activity; watch the heartbeat and re-enable the workflow
+if needed. This schedule avoids requiring sub-daily Vercel Cron on a paid hosting plan.
+Alternatively, a scheduler can send `Authorization: Bearer <CRON_SECRET>` to the same
+endpoint after setting a unique random **CRON_SECRET** of at least 32 characters.
+Do not add that secret to a URL, source file or public log.
 
-Before launch, verify your real sources, parser mappings, permitted reuse, outbound source
-requests, address-geocoding results, map-tile loading and disk persistence on the host.
-Those live external integrations were not validated in the restricted build environment.
-No hosting resource has been provisioned or charged by this build.
+A database lease prevents overlapping scheduled batches across instances. Each batch is
+bounded to leave time before Vercel's function timeout. Sources not yet due are skipped;
+failed checks retain existing listings. Vercel does not start the always-running worker.
+The next scheduled batch continues pending sources and address geocoding.
+
+The real deployment, external source fetching and map tiles must still be verified on
+hosting. The site starts empty; fictional demo listings are never seeded automatically.
+
+### Persistent Python/Docker hosting
+
+SQLite remains supported for a single always-on process with persistent storage.
+Use `Dockerfile`, `compose.yaml` or the optional `render.yaml` blueprint, set a persistent
+**DATABASE_PATH**, **SCHEDULER_ENABLED=1**, **LOCAL_DEV=0**, **ADMIN_PASSWORD**, and the
+actual **PUBLIC_ORIGIN**. Serve behind HTTPS. Configure trusted proxy IPs only for your
+actual reverse proxy. `Start-Mic-List.command` remains available for local use.
 
 ## Storage and backups
 
-SQLite keeps sources, observations, overlays, moderation submissions, accounts and the
-audit trail. The public directory is not a browser-only localStorage mockup.
+PostgreSQL (Vercel) or SQLite (local/persistent hosting) keeps sources, observations,
+overlays, moderation submissions, accounts and the audit trail. The public directory is not a browser-only localStorage mockup.
 
 `/api/export` exports **source configurations and observations only**; it does not back up
 host accounts, claims or edits. Use `scripts/backup.py` for a full consistent SQLite backup:
@@ -178,6 +194,8 @@ host accounts, claims or edits. Use `scripts/backup.py` for a full consistent SQ
 ```bash
 python scripts/backup.py data/miclist.sqlite3 /private/backups/miclist.sqlite3
 ```
+
+For PostgreSQL, use the database provider's backup/restore tools or `pg_dump` for a full backup.
 
 Full backups contain private contact details and password hashes. Keep them confidential.
 Do not commit `.env`, `data/`, databases, backups or runtime sessions to a public repository.
@@ -193,7 +211,11 @@ python scripts/build_preview.py
 python tests/directory_layout_checks.py
 ```
 
-The delivered build passed **17 backend tests** and the included browser check script.
+The backend suite also covers PostgreSQL persistence, transaction rollback, concurrent
+source leases, authenticated scheduled jobs and rejection of unauthorized GitHub identities.
+Set **TEST_DATABASE_URL** to a disposable PostgreSQL database to run storage-dependent
+tests against both engines. Each test creates and removes its own isolated schema.
+The included GitHub CI workflow runs this suite against PostgreSQL 16.
 Backend tests cover authentication, CSRF rejection, owner scoping, claim approval,
 single-use/expired invitations, account reuse, revoked access, hidden listings,
 private submission data, rate limits, snapshots, XLSX/CSV/HTML/JSON-LD parsing,

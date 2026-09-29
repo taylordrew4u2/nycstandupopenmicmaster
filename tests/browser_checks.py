@@ -19,10 +19,10 @@ OUT=ROOT/'test-results'
 OUT.mkdir(exist_ok=True)
 
 def inline_html(preview=False):
-    html=(ROOT/'public/index.html').read_text().replace('<link rel="stylesheet" href="/assets/styles.css">','<style>'+(ROOT/'public/styles.css').read_text()+'</style>')
+    html=(ROOT/'assets/index.html').read_text().replace('<link rel="stylesheet" href="/assets/styles.css">','<style>'+(ROOT/'assets/styles.css').read_text()+'</style>')
     html=html.replace('<script src="/assets/map.js" defer></script>','').replace('<script src="/assets/app.js" defer></script>','')
     code="window.MICLIST_PREVIEW=true;" if preview else '''window.fetch=async (url,options={})=>{const r=await window.serverRequest(url,{method:options.method||'GET',body:options.body||null,headers:options.headers||{}});return {ok:r.status>=200&&r.status<300,status:r.status,json:async()=>r.body};};'''
-    return html.replace('</body>','<script>'+code+'</script><script>'+(ROOT/'public/map.js').read_text()+'</script><script>'+(ROOT/'public/app.js').read_text()+'</script></body>')
+    return html.replace('</body>','<script>'+code+'</script><script>'+(ROOT/'assets/map.js').read_text()+'</script><script>'+(ROOT/'assets/app.js').read_text()+'</script></body>')
 
 
 def run():

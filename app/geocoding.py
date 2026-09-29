@@ -13,7 +13,7 @@ def address_key(row):
     text='|'.join(str(row.get(k,'')).strip().lower() for k in ('address','borough'))
     return hashlib.sha256(text.encode()).hexdigest()
 
-async def geocode_pending(store):
+async def geocode_pending(store, deadline=None):
     if os.getenv('GEOCODING_ENABLED','1')!='1':
         return
     rows=store.public_data(include_hidden=True)['listings']
@@ -31,6 +31,8 @@ async def geocode_pending(store):
     timeout=aiohttp.ClientTimeout(total=15)
     async with aiohttp.ClientSession(timeout=timeout,headers={'User-Agent':'MicListNYC/1.0'},trust_env=False) as session:
         for key,row in pending[:8]:
+            if deadline is not None and deadline-time.monotonic()<18:
+                break
             city='New York' if row['borough']=='Manhattan' else row['borough']
             query=f"{row['address']}, {city}, NY"
             lat,lng,label,state=None,None,'','unmatched'

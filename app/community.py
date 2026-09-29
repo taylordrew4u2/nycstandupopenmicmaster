@@ -110,8 +110,6 @@ def email_value(value):
 
 
 def register(app, store, admin, local_dev):
-    with store.connect() as c:
-        c.executescript(SCHEMA)
     dummy_hash = hash_password(secrets.token_urlsafe(24))
 
     def throttle(request, prefix, limit, seconds=900):
@@ -351,7 +349,7 @@ def register(app, store, admin, local_dev):
         now=time.time()
         config=SourceConfig(name='Manually added',kind='upload',permission_confirmed=True,priority=100).model_dump()
         with store.connect() as c:
-            c.execute("INSERT OR IGNORE INTO sources(id,config,enabled,state,created,next_check,last_success) VALUES ('manual',?,0,'snapshot',?,?,?)",(json.dumps(config),now,now,now))
+            c.execute("INSERT INTO sources(id,config,enabled,state,created,next_check,last_success) VALUES ('manual',?,0,'snapshot',?,?,?) ON CONFLICT(id) DO NOTHING",(json.dumps(config),now,now,now))
             store._apply(c,'manual',[payload],now,mark_missing=False)
             record(c,None,'admin','mic-created',payload['name'])
         return {'ok':True}
