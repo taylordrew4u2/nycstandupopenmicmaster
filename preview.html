@@ -109,6 +109,12 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 #cards .save-button{grid-column:4;grid-row:1}
 .detail-grid{padding:0}
 #cards .card-main>*{align-self:center}
+
+.mic-heading{display:flex;align-items:center;gap:4px;min-width:0}
+#cards .mic-heading .mic-title{min-width:0;flex:1}
+.claim-status{display:inline-block;flex:none;font:9px/13px var(--sans);color:#657080;border:1px solid #d3d9e0;background:#f1f3f6;padding:0 3px;white-space:nowrap;border-radius:2px}
+.claim-status.is-claimed{color:#245d32;border-color:#a9c5af;background:#e9f4eb}
+.popup-mic .claim-status{font:9px/13px var(--sans);margin-left:4px}
 </style>
   
   
@@ -231,7 +237,7 @@ class MicMap {
     const title=document.createElement('strong');title.textContent=new Set(rows.map(r=>r.venue)).size>1?'Mics in this area':rows[0].venue;this.popup.append(title);
     const size=Math.max(1,Math.min(3,Math.floor((this.root.clientHeight-90)/44))),pages=Math.ceil(rows.length/size);
     page=Math.max(0,Math.min(page,pages-1));
-    for(const row of rows.slice(page*size,(page+1)*size)){const item=document.createElement('button');item.className='popup-mic';const time=document.createElement('small');time.textContent=`${row.start_time} · ${row.venue}`;const name=document.createElement('span');name.textContent=row.name;item.append(time,name);item.onclick=()=>this.onSelect(row.id);this.popup.append(item);}
+    for(const row of rows.slice(page*size,(page+1)*size)){const item=document.createElement('button');item.className='popup-mic';const time=document.createElement('small');time.textContent=`${row.start_time} · ${row.venue}`;const name=document.createElement('span');name.textContent=row.name;const claim=document.createElement('span');claim.className='claim-status'+(row.claimed?' is-claimed':'');claim.textContent=row.claimed?'Host claimed':'Unclaimed';name.append(claim);item.append(time,name);item.onclick=()=>this.onSelect(row.id);this.popup.append(item);}
     if(pages>1){const pager=document.createElement('div');pager.className='popup-pages';const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.className=next.className='compact-button';prev.textContent='‹';next.textContent='›';prev.setAttribute('aria-label','Previous nearby mics');next.setAttribute('aria-label','Next nearby mics');prev.disabled=page===0;next.disabled=page===pages-1;prev.onclick=()=>this.show(rows,x,y,page-1);next.onclick=()=>this.show(rows,x,y,page+1);label.textContent=`${page+1}/${pages}`;pager.append(prev,label,next);this.popup.append(pager);}
     this.popup.hidden=false;
     this.popup.style.left=`${Math.max(6,Math.min(this.root.clientWidth-this.popup.offsetWidth-6,x-124))}px`;
@@ -305,6 +311,7 @@ function nextDate(row){
   for(let i=0;i<53;i++){const date=d.toISOString().slice(0,10);if(!(row.excluded_dates||[]).includes(date))return date;d.setUTCDate(d.getUTCDate()+7);}
   return '9999-12-31';
 }
+const claimBadge=r=>`<span class="claim-status ${r.claimed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':'No approved host has claimed this mic.'}">${r.claimed?'Host claimed':'Unclaimed'}</span>`;
 const micTitle=r=>/^open[ -]?mic$/i.test(r.name.trim())?r.venue:r.name;
 const micLink=id=>new URL('/?mic='+encodeURIComponent(id),location.origin==='null'?'https://nycstandupopenmicmaster.vercel.app':location.origin).href;
 function filtered(){return state.data.listings.filter(r=>{
@@ -347,7 +354,7 @@ function card(r){
   const cost=r.cost===0?'Free':r.cost!=null?`$${r.cost}`:r.cost_text?'See fee':'—';
   const located=r.status==='scheduled'&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);
   const title=micTitle(r),venue=`${title===r.venue?(r.neighborhood||r.borough):r.venue} · ${title===r.venue?r.address:r.borough}`;
-  return `<article class="mic-card" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):r.date?esc(dateText(r.date)):esc(DAYS[r.weekday]?.slice(0,3)||'TBD')}</span></div><div class="mic-info"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button>${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}</div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div><button class="save-button ${state.saved.has(r.id)?'saved':''}" data-action="save" data-id="${esc(r.id)}" aria-label="${state.saved.has(r.id)?'Unsave':'Save'} ${esc(r.name)}" aria-pressed="${state.saved.has(r.id)}">${state.saved.has(r.id)?'♥':'♡'}</button></div></article>`;
+  return `<article class="mic-card" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):r.date?esc(dateText(r.date)):esc(DAYS[r.weekday]?.slice(0,3)||'TBD')}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button>${claimBadge(r)}</div>${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}</div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div><button class="save-button ${state.saved.has(r.id)?'saved':''}" data-action="save" data-id="${esc(r.id)}" aria-label="${state.saved.has(r.id)?'Unsave':'Save'} ${esc(r.name)}" aria-pressed="${state.saved.has(r.id)}">${state.saved.has(r.id)?'♥':'♡'}</button></div></article>`;
 }
 function filtersDialog(){
   const option=(v,t,current)=>`<option value="${v}" ${current===v?'selected':''}>${t}</option>`;
@@ -360,7 +367,7 @@ function details(id,tab='mic',page=0){
   const tabs=['mic','notes','sources','link'].map(t=>`<button class="compact-button ${tab===t?'active':''}" data-action="detail-tab" data-id="${esc(id)}" data-tab="${t}" aria-pressed="${tab===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
   let body='';
   if(tab==='mic'){
-    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('WHEN',`${r.date?dateText(r.date):DAYS[r.weekday]} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('METHOD',r.signup_method||'Not listed')}${item('STATUS',r.status)}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?badslava\.com\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
+    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('WHEN',`${r.date?dateText(r.date):DAYS[r.weekday]} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('METHOD',r.signup_method||'Not listed')}${item('STATUS',r.status+' · '+(r.claimed?'Host claimed':'Unclaimed'))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?badslava\.com\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
   }else if(tab==='link'){
     body=`<label for="mic-link">Link to this mic</label><input class="input-full" id="mic-link" readonly value="${esc(micLink(id))}"><div class="detail-actions">${button('Copy link','copy-mic-link',id)}${button(state.saved.has(id)?'Unsave':'Save mic','detail-save',id)}</div><p class="form-helper">No account needed to save mics on this device.</p>`;
   }else{

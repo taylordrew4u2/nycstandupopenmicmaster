@@ -100,3 +100,9 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 #cards .save-button{grid-column:4;grid-row:1}
 .detail-grid{padding:0}
 #cards .card-main>*{align-self:center}
+
+.mic-heading{display:flex;align-items:center;gap:4px;min-width:0}
+#cards .mic-heading .mic-title{min-width:0;flex:1}
+.claim-status{display:inline-block;flex:none;font:9px/13px var(--sans);color:#657080;border:1px solid #d3d9e0;background:#f1f3f6;padding:0 3px;white-space:nowrap;border-radius:2px}
+.claim-status.is-claimed{color:#245d32;border-color:#a9c5af;background:#e9f4eb}
+.popup-mic .claim-status{font:9px/13px var(--sans);margin-left:4px}
