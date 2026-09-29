@@ -39,6 +39,12 @@ with sync_playwright() as p:
         assert metrics['mapHeight'] >= 120 and metrics['mapWidth'] >= 190, metrics
         assert page.locator('#cards .row-updated').count()==metrics['rows']
         assert page.locator('#cards .card-main').evaluate_all('(els)=>els.every(e=>e.scrollWidth<=e.clientWidth+1)')
+        page.locator('#site-menu summary').click()
+        assert page.locator('#site-menu nav').evaluate('''el => {
+            const items=[...el.children].map(e=>e.getBoundingClientRect());
+            return items.length===3 && items.every((r,i)=>r.left>=0 && r.right<=innerWidth && r.bottom<=innerHeight && r.height<40 && (!i || r.top>=items[i-1].bottom));
+        }'''), (width,height,'menu items must stack and fit')
+        page.locator('#site-menu summary').click()
         page.locator('.mic-title').first.click()
         modal = page.locator('#modal')
         assert modal.evaluate('(el)=>el.scrollHeight<=el.clientHeight+1'), (width,height,'mic details scroll')
