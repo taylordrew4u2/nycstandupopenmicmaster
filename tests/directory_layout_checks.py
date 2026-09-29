@@ -128,6 +128,23 @@ with sync_playwright() as p:
     assert max(offsets)<1, offsets
     page.evaluate("map.focus('pin-a')")
     assert page.evaluate('map.zoom')>=17
+    # Double-click keeps the geographic point under the pointer as it zooms.
+    page.evaluate('map.rows=[];map.zoom=14;map.hide();map.draw()')
+    anchor=page.evaluate('''() => {
+      const [cx,cy]=map.project(...map.center);
+      return map.unproject(cx-map.root.clientWidth/4,cy-map.root.clientHeight/4);
+    }''')
+    bounds=page.locator('#nyc-map').bounding_box()
+    page.locator('#nyc-map').dblclick(position={'x':bounds['width']/4,'y':bounds['height']/4})
+    assert page.evaluate('map.zoom')==15
+    offset=page.evaluate('''point => {
+      const [x,y]=map.project(...point),[cx,cy]=map.project(...map.center);
+      return Math.hypot(x-cx+map.root.clientWidth/4,y-cy+map.root.clientHeight/4);
+    }''',anchor)
+    assert offset<2, offset
+    page.evaluate('map.zoom=19;map.draw()')
+    page.locator('#nyc-map').dblclick(position={'x':bounds['width']/4,'y':bounds['height']/4})
+    assert page.evaluate('map.zoom')==19
     assert not errors, errors
     browser.close()
     print(json.dumps({'viewports':results,'pagination':'21 unique mics reachable','page_errors':errors},indent=2))

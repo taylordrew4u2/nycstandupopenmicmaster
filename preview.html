@@ -194,6 +194,18 @@ class MicMap {
     root.querySelectorAll('[data-map]').forEach(b => b.addEventListener('click', () => {
       this.zoom = Math.max(8, Math.min(19, this.zoom + (b.dataset.map === 'in' ? 1 : -1))); this.hide(); this.draw();
     }));
+    root.addEventListener('dblclick', e => {
+      if (e.target.closest('button,a,.map-popup') || e.button !== 0) return;
+      e.preventDefault();
+      if (this.zoom >= 19) return;
+      const bounds=root.getBoundingClientRect();
+      const dx=e.clientX-bounds.left-root.clientLeft-root.clientWidth/2;
+      const dy=e.clientY-bounds.top-root.clientTop-root.clientHeight/2;
+      const [cx,cy]=this.project(...this.center);
+      this.zoom++;
+      this.center=this.unproject((cx+dx)*2-dx,(cy+dy)*2-dy);
+      this.hide(); this.draw();
+    });
     let drag = null;
     root.addEventListener('pointerdown', e => {
       if (e.target.closest('button,a,.map-popup') || e.button !== 0) return;
