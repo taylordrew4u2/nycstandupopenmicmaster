@@ -57,13 +57,22 @@ function occurs(row){
   const d=new Date(nyToday()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+(day-weekday(nyToday())+7)%7);
   return !(row.excluded_dates||[]).includes(d.toISOString().slice(0,10));
 }
+function nextDate(row){
+  if(row.date)return row.date;
+  const today=nyToday(),d=new Date(today+'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate()+(Number(row.weekday)-weekday(today)+7)%7);
+  for(let i=0;i<53;i++){const date=d.toISOString().slice(0,10);if(!(row.excluded_dates||[]).includes(date))return date;d.setUTCDate(d.getUTCDate()+7);}
+  return '9999-12-31';
+}
+const micTitle=r=>/^open[ -]?mic$/i.test(r.name.trim())?r.venue:r.name;
+const micLink=id=>new URL('/?mic='+encodeURIComponent(id),location.origin==='null'?'https://nycstandupopenmicmaster.vercel.app':location.origin).href;
 function filtered(){return state.data.listings.filter(r=>{
   if(!occurs(r))return false;if(state.borough!=='all'&&r.borough!==state.borough)return false;
   if(state.savedOnly&&!state.saved.has(r.id))return false;
   if(state.search&&!`${r.name} ${r.venue} ${r.address} ${r.borough} ${r.neighborhood}`.toLowerCase().includes(state.search))return false;
   if(state.cost==='free'&&r.cost!==0)return false;if(['5','10'].includes(state.cost)&&(r.cost===null||r.cost>Number(state.cost)))return false;
   if(state.signup!=='all'&&!String(r.signup_method).toLowerCase().includes(state.signup))return false;return true;
-}).sort((a,b)=>state.sort==='name'?a.name.localeCompare(b.name):state.sort==='price'?(a.cost??999)-(b.cost??999):((a.date||String(a.weekday))+a.start_time).localeCompare((b.date||String(b.weekday))+b.start_time));}
+}).sort((a,b)=>state.sort==='name'?micTitle(a).localeCompare(micTitle(b)):state.sort==='price'?(a.cost??999)-(b.cost??999):(nextDate(a)+a.start_time).localeCompare(nextDate(b)+b.start_time));}
 function renderDirectory(){
   $('#preview-banner').hidden=!state.demo;
   $('#preview-banner').innerHTML=`Demo · Fictional mics${window.MICLIST_PREVIEW?'':' <button data-action="exit-demo">Exit demo</button>'}`;
@@ -94,10 +103,10 @@ function renderCards(){
   box.innerHTML=rows.length?rows.slice(start,start+size).map(card).join(''):state.data.listings.length?blank('No matching mics.','',button('Reset filters','reset')):blank('No mics yet.','',`<button class="demo-toggle" data-action="demo">View demo</button>`);
 }
 function card(r){
-  const cost=r.cost===0?'Free':r.cost!=null?`$${r.cost}`:'—';
+  const cost=r.cost===0?'Free':r.cost!=null?`$${r.cost}`:r.cost_text?'See fee':'—';
   const located=r.status==='scheduled'&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);
-  const venue=`${r.venue} · ${r.borough}`;
-  return `<article class="mic-card" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):r.date?esc(dateText(r.date)):esc(DAYS[r.weekday]?.slice(0,3)||'TBD')}</span></div><div class="mic-info"><button class="mic-title" title="${esc(r.name)}" data-action="details" data-id="${esc(r.id)}">${esc(r.name)}</button>${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}</div><div class="mic-cost" aria-label="Entry fee: ${esc(cost)}">${cost}</div><button class="save-button ${state.saved.has(r.id)?'saved':''}" data-action="save" data-id="${esc(r.id)}" aria-label="${state.saved.has(r.id)?'Unsave':'Save'} ${esc(r.name)}" aria-pressed="${state.saved.has(r.id)}">${state.saved.has(r.id)?'♥':'♡'}</button></div></article>`;
+  const title=micTitle(r),venue=`${title===r.venue?(r.neighborhood||r.borough):r.venue} · ${title===r.venue?r.address:r.borough}`;
+  return `<article class="mic-card" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):r.date?esc(dateText(r.date)):esc(DAYS[r.weekday]?.slice(0,3)||'TBD')}</span></div><div class="mic-info"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button>${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}</div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div><button class="save-button ${state.saved.has(r.id)?'saved':''}" data-action="save" data-id="${esc(r.id)}" aria-label="${state.saved.has(r.id)?'Unsave':'Save'} ${esc(r.name)}" aria-pressed="${state.saved.has(r.id)}">${state.saved.has(r.id)?'♥':'♡'}</button></div></article>`;
 }
 function filtersDialog(){
   const option=(v,t,current)=>`<option value="${v}" ${current===v?'selected':''}>${t}</option>`;
@@ -107,12 +116,14 @@ function findMic(id){return state.data.listings.find(r=>r.id===id)||state.commun
 function details(id,tab='mic',page=0){
   const r=findMic(id);if(!r)return;
   const item=(label,value)=>`<div class="detail-item"><small>${label}</small><strong>${esc(value)}</strong></div>`;
-  const tabs=['mic','notes','sources'].map(t=>`<button class="compact-button ${tab===t?'active':''}" data-action="detail-tab" data-id="${esc(id)}" data-tab="${t}" aria-pressed="${tab===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
+  const tabs=['mic','notes','sources','link'].map(t=>`<button class="compact-button ${tab===t?'active':''}" data-action="detail-tab" data-id="${esc(id)}" data-tab="${t}" aria-pressed="${tab===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
   let body='';
   if(tab==='mic'){
-    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('WHEN',`${r.date?dateText(r.date):DAYS[r.weekday]} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('METHOD',r.signup_method||'Not listed')}${item('STATUS',r.status)}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
+    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('WHEN',`${r.date?dateText(r.date):DAYS[r.weekday]} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('METHOD',r.signup_method||'Not listed')}${item('STATUS',r.status)}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?badslava\.com\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
+  }else if(tab==='link'){
+    body=`<label for="mic-link">Link to this mic</label><input class="input-full" id="mic-link" readonly value="${esc(micLink(id))}"><div class="detail-actions">${button('Copy link','copy-mic-link',id)}${button(state.saved.has(id)?'Unsave':'Save mic','detail-save',id)}</div><p class="form-helper">No account needed to save mics on this device.</p>`;
   }else{
-    const text=tab==='notes'?[r.notes,r.purchase_minimum&&`Purchase minimum: ${r.purchase_minimum}`,r.excluded_dates?.length&&`Not running: ${r.excluded_dates.map(dateText).join(', ')}`,r.conflicts?.length&&`Sources disagree: ${r.conflicts.join(', ')}`,r.stale&&'Source needs a recheck.',r.curated&&'Edited by an administrator or approved host.'].filter(Boolean).join('\n\n')||'No additional notes.':null;
+    const text=tab==='notes' ?[r.notes,r.purchase_minimum&&`Purchase minimum: ${r.purchase_minimum}`,r.excluded_dates?.length&&`Not running: ${r.excluded_dates.map(dateText).join(', ')}`,r.conflicts?.length&&`Sources disagree: ${r.conflicts.join(', ')}`,r.stale&&'Source needs a recheck.',r.curated&&'Edited by an administrator or approved host.'].filter(Boolean).join('\n\n')||'No additional notes.':null;
     const texts=tab==='notes'?[text]:(r.sources||[]).map(source=>[source.name,source.kind==='upload'?'Uploaded snapshot':`Checked ${ago(source.checked_at)}`,source.missing_count?'Missing from latest source.':'',source.values?Object.entries(source.values).map(([k,v])=>`${k}: ${v}`).join('\n'):''].filter(Boolean).join('\n'));
     const size=innerHeight<450?180:innerWidth<650?290:440,parts=[];
     (texts.length?texts:['No source listed.']).forEach((text,i)=>{
@@ -121,8 +132,8 @@ function details(id,tab='mic',page=0){
     page=Math.max(0,Math.min(page,parts.length-1));const part=parts[page];
     body=`<p class="text-page">${esc(part.text)}</p>${part.source?.url?external(part.source.url,'Open source','text-link'):''}${tab==='sources'?'<p class="form-helper">Check the original listing before going.</p>':''}${parts.length>1?`<div class="detail-pages"><button class="compact-button" data-action="detail-tab" data-id="${esc(id)}" data-tab="${tab}" data-page="${page-1}" ${page===0?'disabled':''}>‹ Previous</button><span>${page+1}/${parts.length}</span><button class="compact-button" data-action="detail-tab" data-id="${esc(id)}" data-tab="${tab}" data-page="${page+1}" ${page===parts.length-1?'disabled':''}>Next ›</button></div>`:''}`;
   }
-  modal(r.name,`<div class="detail-tabs">${tabs}</div><div class="detail-panel">${body}</div>`,button('Submit a fix','submit-fix',id)+button(r.claimed?'Host / claim help':'Claim this mic','submit-claim',id));
-  $('#modal').dataset.view='mic';$('#modal .modal-head h2').title=r.name;
+  modal(micTitle(r),`<div class="detail-tabs">${tabs}</div><div class="detail-panel">${body}</div>`,button('Submit a fix','submit-fix',id)+button(r.claimed?'Host / claim help':'Claim this mic','submit-claim',id));
+  $('#modal').dataset.view='mic';$('#modal .modal-head h2').title=micTitle(r);
 }
 function submission(id,kind){if(state.demo){toast('These are fictional examples. Connect a real source before submitting fixes or claims.');return;}const r=findMic(id);if(!r)return;if(kind==='claim'&&r.claimed){modal('This mic has a host.',`<p>The host can sign in to edit this listing. For ownership disputes or corrections, submit a fix for the administrator.</p><a class="button primary" href="/owner">Host login ↗</a>`,button('Submit a fix','submit-fix',id));return;}
   modal(kind==='claim'?'Claim this mic.':'Spotted something wrong?',`<p>${esc(r.name)} · ${esc(r.venue)}</p><form id="submission-form" data-id="${esc(id)}" data-kind="${kind}">${field('Your name','name','', 'text',true)}${field(kind==='claim'?'Email for your host account':'Email (optional, for follow-up)','email','','email',kind==='claim')}${textField(kind==='claim'?'How can we verify you run this mic?':'What needs fixing? Include the correct information and a source link.','message','',true)}<div class="honeypot" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div><p class="form-helper">${kind==='claim'?'The administrator verifies and approves claims. Approval does not automatically email you; the administrator will share your one-use signup link.':'Your correction will be reviewed. It does not directly change the published listing.'} Contact details are visible only to the administrator, not published.</p><button class="button primary" type="submit">${kind==='claim'?'Submit claim':'Send correction'} ↗</button></form>`);
@@ -213,6 +224,12 @@ document.addEventListener('click',async e=>{
     if(action==='detail-tab')details(id,el.dataset.tab,Number(el.dataset.page||0));
     if(action==='map-reset')map?.reset();
     if(action==='details')details(id);
+    if(action==='copy-mic-link'){
+      try{await navigator.clipboard.writeText(micLink(id));toast('Link copied.');}
+      catch{$('#mic-link').focus();$('#mic-link').select();toast('Select and copy this link.');}
+    }
+    if(action==='detail-save'){state.saved.has(id)?state.saved.delete(id):state.saved.add(id);try{localStorage.setItem('miclist-saved',JSON.stringify([...state.saved]));}catch{}renderDirectory();details(id,'link');}
+
     if(action==='locate'&&!map?.focus(id))toast('This mic has no map location yet.');
     if(action==='save'){state.saved.has(id)?state.saved.delete(id):state.saved.add(id);try{localStorage.setItem('miclist-saved',JSON.stringify([...state.saved]));}catch{}renderDirectory();}
     if(action==='toggle-saved'||action==='saved-nav'){state.savedOnly=!state.savedOnly;if(location.pathname!=='/'){location.href='/';return;}renderDirectory();}
@@ -263,7 +280,7 @@ async function boot(){
   if(location.pathname==='/admin'||location.hash==='#sources'){await renderAdmin();}
   else if(location.pathname==='/owner'){await renderOwner();}
   else if(location.pathname==='/claim'){await renderClaim();}
-  else{await loadPublic();}
+  else{await loadPublic();const id=new URLSearchParams(location.search).get('mic');if(id){const r=findMic(id);if(r){state.day=r.date?weekday(r.date):r.weekday;renderDirectory();details(id);}else toast('This mic is no longer listed.');}}
 }
 new ResizeObserver(()=>{if(!$('#view-directory').hidden)renderCards();}).observe($('#cards'));
 boot();
