@@ -102,9 +102,8 @@ with sync_playwright() as p:
     assert page.evaluate("micTitle({name:'Open Mic',venue:'QED'})")=='Open Mic'
     page.locator('#site-menu summary').click()
     assert page.get_by_role('link',name='Host sign in',exact=True).is_visible()
-    page.get_by_role('button',name='About',exact=True).click()
-    assert page.get_by_role('heading',name='About',exact=True).is_visible()
-    page.get_by_role('button',name='Close dialog').click()
+    assert page.get_by_role('link',name='About',exact=True).get_attribute('href')=='/about'
+    page.locator('#site-menu summary').click()
     # Nearby venues may cluster at city scale, but never shift venue dots at street scale.
     page.evaluate("""() => {
       const base=state.data.listings[0];
