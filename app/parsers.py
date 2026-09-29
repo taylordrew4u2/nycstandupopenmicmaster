@@ -340,6 +340,10 @@ def extract(content: bytes, config: SourceConfig, content_type='', filename=''):
     else:
         soup = BeautifulSoup(content.decode('utf-8', errors='replace'), 'html.parser')
         raw = []
+        from .badslava import supports, calendar_rows
+        if kind == 'auto' and supports(config.url):
+            raw = calendar_rows(soup, config.url)
+            kind = 'badslava'
         if kind in ('auto', 'jsonld'):
             raw = parse_jsonld(soup)
             if raw:
