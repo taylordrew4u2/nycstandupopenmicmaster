@@ -100,6 +100,8 @@ def run():
             expect(page.get_by_role('button',name='Hide mic & resolve')).to_be_visible()
             page.locator('[data-admin-tab="about"]').click()
             page.get_by_label('Page heading').fill('About Taylor and this list')
+            page.locator('[data-admin-tab="about"]').click()
+            assert page.get_by_label('Page heading').input_value()=='About Taylor and this list'
             page.get_by_role('button',name='Why',exact=True).click()
             page.get_by_label('Why you built it',exact=False).fill('A test introduction from the site administrator.')
             page.get_by_role('button',name='SEO',exact=True).click()
