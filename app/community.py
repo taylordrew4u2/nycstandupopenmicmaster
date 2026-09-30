@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS submissions (
  kind TEXT NOT NULL, name TEXT NOT NULL, email TEXT NOT NULL, message TEXT NOT NULL,
  state TEXT NOT NULL DEFAULT 'pending', created REAL NOT NULL, reviewed REAL, note TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS claim_status_links (
+ token_hash TEXT PRIMARY KEY, submission_id TEXT UNIQUE NOT NULL REFERENCES submissions(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS mic_proposals (
  id TEXT PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
  email TEXT NOT NULL, message TEXT NOT NULL, payload TEXT NOT NULL,
@@ -240,7 +243,7 @@ def register(app, store, admin, local_dev):
         email = email_value(body.email)
         if len(body.name.strip()) < 2 or len(body.message.strip()) < 10:
             raise HTTPException(400, 'Include your name and how we can verify that you run this mic.')
-        allowed = {'name', 'venue', 'address', 'borough', 'weekday', 'date', 'start_time', 'cost'}
+        allowed = {'name', 'venue', 'address', 'borough', 'weekday', 'date', 'start_time', 'cost', 'frequency', 'recurrence_anchor'}
         if set(body.fields) - allowed:
             raise HTTPException(400, 'Unsupported mic submission fields.')
         if not str(body.fields.get('address', '')).strip():
@@ -330,6 +333,8 @@ def register(app, store, admin, local_dev):
         email = email_value(body.email) if body.email else ''
         if body.kind=='claim' and not email:
             raise HTTPException(400,'An email is required to claim a mic.')
+        claim_token = secrets.token_urlsafe(40) if body.kind == 'claim' else None
+        submission_id = uuid.uuid4().hex
         with store.connect() as c:
             c.execute('BEGIN IMMEDIATE')
             if body.kind=='claim':
@@ -338,8 +343,27 @@ def register(app, store, admin, local_dev):
                 if c.execute("SELECT 1 FROM submissions WHERE mic_id=? AND email=? AND kind='claim' AND state IN ('pending','approved')",(mic_id,email)).fetchone():
                     raise HTTPException(409,'A claim for this mic and email is already being reviewed.')
             c.execute('INSERT INTO submissions(id,mic_id,mic_name,kind,name,email,message,created) VALUES (?,?,?,?,?,?,?,?)',
-                      (uuid.uuid4().hex,mic_id,mic['name'],body.kind,body.name.strip(),email,body.message.strip(),time.time()))
+                      (submission_id,mic_id,mic['name'],body.kind,body.name.strip(),email,body.message.strip(),time.time()))
+            if claim_token:
+                c.execute('INSERT INTO claim_status_links VALUES (?,?)', (token_hash(claim_token), submission_id))
+        if claim_token:
+            return {'ok': True, 'status_path': '/claim-status#' + claim_token,
+                    'message': 'Save this private link. Do not lose it. Check it for approval and password setup.'}
         return {'ok':True,'message':'Submitted for administrator review. Nothing changes until approved.'}
+
+    @app.post('/api/claims/status')
+    async def claim_status(body: InvitationLookup, request: Request):
+        throttle(request, 'claim-status', 150)
+        hashed = token_hash(body.token)
+        with store.connect() as c:
+            row = c.execute('SELECT s.* FROM claim_status_links l JOIN submissions s ON s.id=l.submission_id WHERE l.token_hash=?', (hashed,)).fetchone()
+            if not row:
+                raise HTTPException(404, 'This private status link is invalid.')
+            invite = c.execute('SELECT expires FROM invitations WHERE token_hash=? AND submission_id=? AND used IS NULL AND expires>?', (hashed, row['id'], time.time())).fetchone()
+            return {'state': row['state'], 'mic_name': row['mic_name'], 'reply': '',
+                    'created': row['created'], 'reviewed': row['reviewed'], 'mic_id': row['mic_id'],
+                    'can_setup': row['state']=='approved' and bool(invite),
+                    'expires_at': invite['expires'] if invite else None}
 
     @app.get('/api/admin/community', dependencies=[Depends(admin)])
     async def queue():
@@ -369,10 +393,14 @@ def register(app, store, admin, local_dev):
                 raw=secrets.token_urlsafe(40)
                 c.execute('DELETE FROM invitations WHERE submission_id=?',(submission_id,))
                 c.execute('INSERT INTO invitations VALUES (?,?,?,NULL)',(token_hash(raw),submission_id,now+7*86400))
+                status_link = c.execute('SELECT token_hash FROM claim_status_links WHERE submission_id=?', (submission_id,)).fetchone()
+                if status_link:
+                    c.execute('INSERT INTO invitations VALUES (?,?,?,NULL)', (status_link['token_hash'], submission_id, now+7*86400))
                 c.execute("UPDATE submissions SET state='approved',reviewed=?,note=? WHERE id=?",(now,body.note,submission_id))
                 record(c,row['mic_id'],'admin','claim-approved',submission_id)
                 return {'ok':True,'invite_path':'/claim#'+raw,'email':row['email'],'expires_at':now+7*86400,
-                        'message':'Copy and send this one-use signup link to the verified host. It has not been emailed.'}
+                        'status_link_ready':bool(status_link),
+                        'message':'The host can now set a password from their saved status link.' if status_link else 'Legacy claim: send the setup link to this host.'}
             if body.action == 'hide':
                 if row['kind'] != 'report':
                     raise HTTPException(400, 'Only an inactive-mic report can be resolved by hiding the mic.')

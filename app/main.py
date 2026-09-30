@@ -363,6 +363,7 @@ def create_app(db_path=None):
 
     @app.get('/admin')
     @app.get('/owner')
+    @app.get('/claim-status')
     @app.get('/claim')
     @app.get('/submit')
     @app.get('/')
