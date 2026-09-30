@@ -44,3 +44,18 @@ def test_exact_same_venue_date_time_deduplicates_only_generic_calendar(database)
     merged = next(r for r in records if r['id']==original)
     assert len(merged['sources'])==2
     assert merged['name']=='Wednesday Open Mic'
+
+
+def test_comediq_title_matches_only_after_removing_explicit_time(database):
+    from app.parsers import normalize_rows
+    store=Store(database)
+    config=SourceConfig(name='Comediq',url='https://comediq.us/mics.json',permission_confirmed=True)
+    rows,warnings,skipped=normalize_rows([{'id':'existing','name':'Wednesday Open Mic','venue':'Bushwick Comedy Club','address':'259 Melrose St','borough':'Brooklyn','date':'2026-09-30','start_time':'19:30'}],config)
+    store.commit_preview(store.preview(config.model_dump(),{'rows':rows,'warnings':warnings,'skipped':skipped}))
+    original=store.public_data()['listings'][0]['id']
+    parsed=extract(page([event('Wednesday Open Mic (7:30PM)'),event('Different Open Mic (7:30PM)',id='different')]),CONFIG)
+    store.commit_preview(store.preview(CONFIG.model_dump(),parsed))
+    records=store.public_data()['listings']
+    assert len(records)==2
+    merged=next(r for r in records if r['id']==original)
+    assert len(merged['sources'])==2

@@ -291,8 +291,17 @@ class Store:
         from .comediq import supports as comediq_source
         from .bushwick import supports as bushwick_source
         calendar_slots = defaultdict(set)
+        named_slots = defaultdict(set)
+        def named_slot(p):
+            # Venue titles sometimes append the already-recorded time. No fuzzy names.
+            title = re.sub(r"\s*\(\d{1,2}:\d{2}\s*[AP]M\)\s*$", "", p["name"], flags=re.I)
+            return venue_slot(p), key(p["venue"]), key(title)
         for o in observations:
             source = sources.get(o['source_id'])
+            if source and comediq_source(source['config']['url']):
+                p = json.loads(o['payload'])
+                if venue_slot(p):
+                    named_slots[named_slot(p)].add((p['name'], p['venue']))
             if source and badslava_source(source['config']['url']) and not o['missing_count']:
                 p = json.loads(o['payload'])
                 slot = venue_slot(p)
@@ -308,15 +317,20 @@ class Store:
             name, venue = payload['name'], payload['venue']
             unmatched_slot = None
             venue_calendar = bushwick_source(source['config']['url'])
+            namespace = 'bushwick' if venue_calendar else 'comediq'
             if comediq_source(source['config']['url']) or venue_calendar:
                 matches = calendar_slots.get(venue_slot(payload), set())
                 if len(matches) == 1:
                     name, venue = next(iter(matches))
                 else:
                     unmatched_slot = digest(venue_slot(payload))[:16]
+                    exact_names = named_slots.get(named_slot(payload), set()) if venue_calendar else set()
+                    if len(exact_names) == 1:
+                        name, venue = next(iter(exact_names))
+                        namespace = 'comediq'
             identity = f"{key(name)}|{key(venue)}|{key(payload['borough'])}|{schedule}"
             if unmatched_slot:
-                identity += ('|bushwick:' if venue_calendar else '|comediq:') + unmatched_slot
+                identity += '|' + namespace + ':' + unmatched_slot
             grouped[identity].append((dict(o), payload, source))
         final_groups = {}
         for identity, items in grouped.items():
