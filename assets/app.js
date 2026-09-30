@@ -179,26 +179,92 @@ function editForm(id,mode){const r=id?findMic(id):{};if(id&&!r){toast('This mic 
   modal(id?'Edit the mic.':'Add a mic.',`<p>${mode==='owner'?'You can edit only mics approved for your account. Your edits take priority over imports.':'Changes are saved over the source data. Unchanged fields continue syncing.'}</p><form id="edit-form" data-id="${esc(id||'')}" data-mode="${mode}"><div class="form-row">${field('Mic name','name',r.name||'','text',true)}${field('Venue','venue',r.venue||'','text',true)}</div>${field('Street address','address',r.address||'','text',true)}<div class="form-row">${selectField('Borough','borough',BOROUGHS,r.borough||'Manhattan')}${field('Neighborhood (optional)','neighborhood',r.neighborhood||'')}</div><div class="form-row">${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),r.weekday??0)}${field('One-time date (overrides weekly day)','date',r.date||'','date')}</div><div class="form-row">${field('Start time','start_time',r.start_time||'19:00','time',true)}${field('Signup time (optional)','signup_time',r.signup_time||'','time')}</div><div class="form-row">${field('Entry fee (Free, $5, or descriptive)','cost',r.cost_text||'')}${field('Purchase minimum (optional)','purchase_minimum',r.purchase_minimum||'')}</div><div class="form-row">${field('Minutes per comic','set_minutes',r.set_minutes||'','number')}${field('Signup method','signup_method',r.signup_method||'')}</div>${field('Host name(s), public','host_names',r.host_names||'')}${textField('Host social links (optional, up to 5 URLs)','host_socials',r.host_socials||'')}${field('Signup link','signup_url',r.signup_url||'','url')}${selectField('Status','status',['scheduled','cancelled','postponed'],r.status||'scheduled')}${field('Excluded dates, comma-separated YYYY-MM-DD','excluded_dates',(r.excluded_dates||[]).join(', '))}${textField('Notes','notes',r.notes||'')}<details><summary>Map pin coordinates</summary><p class="form-helper">Use accurate coordinates for this venue. Leave both blank to request address geocoding. Approximate geocoder matches are labeled on the directory.</p><div class="form-row">${field('Latitude','latitude',r.latitude??'','number')}${field('Longitude','longitude',r.longitude??'','number')}</div></details><button type="submit" class="button primary">Save mic ↗</button></form>`);
   $('#edit-form').dataset.original=JSON.stringify(Object.fromEntries(new FormData($('#edit-form'))));
 }
+function hostTab(tab){
+  state.ownerTab=tab;
+  $$('[data-host-panel]').forEach(p=>p.hidden=p.dataset.hostPanel!==tab);
+  $$('[data-host-tab]').forEach(b=>{const active=b.dataset.hostTab===tab;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+}
+function hostDirty(){const f=$('#host-edit-form');if(!f)return false;return JSON.stringify(Object.fromEntries(new FormData(f)))!==f.dataset.original;}
+function hostMic(){return state.owner?.listings.find(r=>r.id===state.ownerMic);}
+function renderHostEditor(){
+  const r=hostMic(),box=$('#host-editor');if(!box||!r)return;
+  box.innerHTML=`<div class="host-mic-summary"><div><strong title="${esc(r.name)}">${esc(r.name)}</strong><small>Updated ${esc(updatedText(r))} · ${r.hidden?'Hidden by site admin':esc(r.status)}</small></div>${r.hidden?'':`<a class="text-link" href="${esc(micLink(r.id))}" target="_blank" rel="noopener">View listing</a>`}</div>
+  ${r.hidden?'<p class="host-notice">This mic is hidden by the site administrator. You can edit it here.</p>':''}
+  <div class="host-tabs" aria-label="Mic settings">${[['mic','Mic'],['when','When'],['where','Where'],['hosts','Hosts']].map(([id,label])=>`<button type="button" data-host-tab="${id}" aria-pressed="false">${label}</button>`).join('')}</div>
+  <form id="host-edit-form" data-id="${esc(r.id)}">
+    <div class="host-edit-panel" data-host-panel="mic">
+      ${field('Mic name','name',r.name||'','text',true)}
+      <div class="form-row">${field('Entry fee','cost',r.cost_text||'')}${field('Minutes per comic','set_minutes',r.set_minutes??'','number')}</div>
+      ${field('Purchase minimum (optional)','purchase_minimum',r.purchase_minimum||'')}
+      ${textField('Notes','notes',r.notes||'')}
+    </div>
+    <div class="host-edit-panel" data-host-panel="when" hidden>
+      <div class="form-row">${field('Date (blank for weekly)','date',r.date||'','date')}${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),r.weekday??0)}</div>
+      <div class="form-row">${field('Start time','start_time',r.start_time||'19:00','time',true)}${field('Signup time (optional)','signup_time',r.signup_time||'','time')}</div>
+      ${selectField('Status for this listing','status',[['scheduled','Scheduled'],['cancelled','Cancelled'],['postponed','Postponed']],r.status||'scheduled')}
+      ${field('Skip dates (YYYY-MM-DD, comma separated)','excluded_dates',(r.excluded_dates||[]).join(', '))}
+      <p class="host-help">A date overrides the weekly day. Date and cancellation changes apply to this occurrence.</p>
+    </div>
+    <div class="host-edit-panel" data-host-panel="where" hidden>
+      ${field('Venue','venue',r.venue||'','text',true)}${field('Street address','address',r.address||'','text',true)}
+      <div class="form-row">${selectField('Borough','borough',BOROUGHS,r.borough||'Manhattan')}${field('Neighborhood','neighborhood',r.neighborhood||'')}</div>
+      <div class="form-row">${field('Latitude (optional)','latitude',r.latitude??'','number')}${field('Longitude (optional)','longitude',r.longitude??'','number')}</div>
+      <p class="host-help">Leave both coordinates blank to locate the street address automatically.</p>
+    </div>
+    <div class="host-edit-panel" data-host-panel="hosts" hidden>
+      ${field('Host name(s), public','host_names',r.host_names||'')}
+      ${textField('Social links (optional, one URL per line, up to 5)','host_socials',r.host_socials||'')}
+      ${field('Signup link (optional)','signup_url',r.signup_url||'','url')}
+      <p class="host-help">These details appear when someone opens your mic.</p>
+    </div>
+    <div class="host-save-row"><span id="host-save-state" role="status">Your edits are protected from imports.</span><button type="submit" class="button primary">Save changes</button></div>
+  </form>`;
+  const f=$('#host-edit-form');f.dataset.original=JSON.stringify(Object.fromEntries(new FormData(f)));hostTab(state.ownerTab||'mic');
+}
 async function renderOwner(){
-  $('#view-directory').hidden=true;$('#view-sources').hidden=false;const root=$('#view-sources');
-  try{state.owner=await api('/api/owner/me');root.innerHTML=`<div class="admin-heading"><div><div class="eyebrow">APPROVED HOST / ${esc(state.owner.name)}</div><h1>Your mics<span class="red-period">.</span></h1><p>Keep your information current. Your edits are protected from source refreshes.</p></div><div class="admin-buttons">${button('Sign out','owner-logout')}</div></div>${state.owner.listings.length?state.owner.listings.map(r=>`<article class="queue-item"><h3>${esc(r.name)}</h3><p>${esc(r.venue)} · ${esc(r.date||DAYS[r.weekday])} · ${esc(timeText(r.start_time))}</p>${r.hidden?'<p class="security-warning">This mic is hidden by the administrator. Your edits do not republish it.</p>':''}<div class="queue-buttons">${button('Edit my mic ↗','edit-owner',r.id,'primary')}</div></article>`).join(''):blank('No mic access is active.','Claims require administrator approval and a valid invitation. Your access may have been revoked.')}`;
-  }catch(err){if(err.status!==401&&!window.MICLIST_PREVIEW){root.innerHTML=blank('Host login unavailable.',esc(err.message));return;}root.innerHTML=`<div class="login-panel"><div class="eyebrow">FOR APPROVED MIC OWNERS</div><h2>Your mic. Your details.</h2><p>Sign in with the account you created after your claim was approved.</p><form id="owner-login">${field('Email','email','','email',true)}${field('Password','password','','password',true)}<button class="button primary" type="submit">Sign in ↗</button></form><p class="community-link">Need an account? Find your listing and select <strong>Claim this mic</strong>. An administrator must approve it first.</p><a href="/" class="text-link">Find your mic →</a></div>`;}
+  $('#view-directory').hidden=true;$('#view-sources').hidden=false;const root=$('#view-sources');root.classList.add('host-page');document.title='Host dashboard | NYC Stand Up Open Mic Master';
+  try{
+    state.owner=await api('/api/owner/me');
+    const rows=state.owner.listings.slice().sort((a,b)=>Number(!!(a.date&&a.date<nyToday()))-Number(!!(b.date&&b.date<nyToday()))||(nextDate(a)+a.start_time).localeCompare(nextDate(b)+b.start_time));
+    if(!rows.some(r=>r.id===state.ownerMic))state.ownerMic=rows[0]?.id;
+    root.innerHTML=`<div class="host-heading"><div><h1>Manage your mic</h1><small title="${esc(state.owner.name)}">${esc(state.owner.name)} · Approved host</small></div><div class="host-buttons">${button('Password','owner-password')}${button('Sign out','owner-logout')}</div></div>
+      ${rows.length>1?`<label class="host-chooser">Your approved listings<select id="host-mic-select">${rows.map(r=>`<option value="${esc(r.id)}" ${r.id===state.ownerMic?'selected':''}>${esc(r.name)} · ${esc(r.date||DAYS[r.weekday])} · ${esc(timeText(r.start_time))}</option>`).join('')}</select></label>`:''}
+      ${rows.length?'<div id="host-editor"></div>':blank('No available listings.','Your approved listing is not currently available. Ask the site administrator to check it.')}`;
+    renderHostEditor();
+  }catch(err){
+    state.owner=null;
+    if(err.status!==401&&!window.MICLIST_PREVIEW){root.innerHTML=blank('Host sign-in unavailable.',esc(err.message),button('Try again','owner-refresh'));return;}
+    root.innerHTML=`<div class="login-panel"><h1>Host sign in</h1><p>Use the account created from your approved claim.</p><form id="owner-login">${field('Email','email','','email',true)}${field('Password','password','','password',true)}<button class="button primary" type="submit">Sign in</button></form><p class="community-link">First time? Open the setup link shared after your claim was approved.</p><a href="/" class="text-link">Find and claim your mic</a></div>`;
+  }
 }
 async function renderClaim(){
-  $('#view-directory').hidden=true;$('#view-sources').hidden=false;const root=$('#view-sources');const token=location.hash.slice(1);
+  $('#view-directory').hidden=true;$('#view-sources').hidden=false;const root=$('#view-sources');const token=location.hash.slice(1);root.classList.add('host-page');document.title='Set up host access | NYC Stand Up Open Mic Master';
   if(!token){root.innerHTML=blank('An invitation is required.','Use the one-use signup link shared by the administrator after your mic claim is approved.');return;}
-  try{const info=await api('/api/owner/invitation',{method:'POST',body:{token,password:'unused'}});root.innerHTML=`<div class="login-panel"><div class="eyebrow">YOUR CLAIM WAS APPROVED</div><h2>${info.existing_account?'Connect this mic.':'Create your host login.'}</h2><p>${esc(info.mic_name)}</p><p class="notice-inline">Account email: ${esc(info.email)}</p><form id="redeem-form">${field(info.existing_account?'Your existing account password':'Choose a password (15+ characters)','password','','password',true)}<button type="submit" class="button primary">${info.existing_account?'Add mic to my account':'Create account & edit my mic'} ↗</button></form></div>`;$('#redeem-form').dataset.token=token;
+  try{const info=await api('/api/owner/invitation',{method:'POST',body:{token}});root.innerHTML=`<div class="login-panel"><div class="eyebrow">YOUR CLAIM WAS APPROVED</div><h2>${info.existing_account?'Connect this mic.':'Create your host login.'}</h2><p>${esc(info.mic_name)}</p><p class="notice-inline">Account email: ${esc(info.email)}</p><form id="redeem-form">${field(info.existing_account?'Your existing account password':'Choose a password (15+ characters)','password','','password',true)}${info.existing_account?'':field('Confirm password','confirm_password','','password',true)}<button type="submit" class="button primary">${info.existing_account?'Add mic to my account':'Create account & edit my mic'} ↗</button></form></div>`;$('#redeem-form').dataset.token=token;$('#redeem-form').dataset.newAccount=String(!info.existing_account);if(!info.existing_account)$$('input[type=password]',$('#redeem-form')).forEach(i=>{i.autocomplete='new-password';i.minLength=15;});
   }catch(err){root.innerHTML=blank('This invitation cannot be used.',esc(err.message));}
 }
 function how(){modal('One list. Traceable information.',`<div class="how-step"><span class="how-number">01</span><div><h3>Your sources, connected.</h3><p>An administrator adds permitted websites and spreadsheets, then reviews the first import. A pasted URL must contain supported data or have configured extraction rules.</p></div></div><div class="how-step"><span class="how-number">02</span><div><h3>Changes, not guesses.</h3><p>Scheduled checks update supported sources. Missing rows, parser failures and conflicts are flagged rather than treated as cancellations. Uploads are snapshots.</p></div></div><div class="how-step"><span class="how-number">03</span><div><h3>Real hosts have a say.</h3><p>Anyone may submit corrections or claim a mic. Only administrator-approved owners can edit their mic. Host edits are protected from imports.</p></div></div><div class="how-step"><span class="how-number">04</span><div><h3>Check before heading out.</h3><p>Click a day to filter the map and list. Pins can represent multiple sessions. Unlocated mics remain in the list; approximate address matches are labeled. This directory does not guarantee a mic will run.</p></div></div>`);}
 // Form submissions are same-origin authenticated requests; no credentials are stored in browser storage.
 document.addEventListener('submit',async e=>{
-  const f=e.target;if(!['admin-login','owner-login','submission-form','source-form','edit-form','redeem-form','admin-password-form'].includes(f.id))return;e.preventDefault();const b=$('button[type=submit]',f),old=b.textContent;b.disabled=true;b.textContent='Working…';$('.form-error',f)?.remove();
+  const f=e.target;if(!['admin-login','owner-login','submission-form','source-form','edit-form','redeem-form','admin-password-form','host-edit-form','owner-password-form'].includes(f.id))return;e.preventDefault();const b=$('button[type=submit]',f),old=b.textContent;b.disabled=true;b.textContent='Working…';$('.form-error',f)?.remove();
   try{const raw=Object.fromEntries(new FormData(f));
+    if(f.id==='owner-password-form'){
+      if(raw.new_password!==raw.confirm_password)throw Error('New passwords do not match.');
+      await api('/api/owner/password',{method:'POST',body:{current_password:raw.current_password,new_password:raw.new_password}});
+      f.reset();$('#modal').close();state.owner=null;await renderOwner();toast('Password changed. Sign in again.');
+    }
+    if(f.id==='host-edit-form'){
+      const original=JSON.parse(f.dataset.original),fields={};for(const [key,value]of Object.entries(raw))if(value!==original[key])fields[key]=value;
+      if(!Object.keys(fields).length){toast('No changes to save.');return;}
+      if('date' in fields||'weekday' in fields){fields.date=raw.date;fields.weekday=raw.weekday;}
+      if('address' in fields||'borough' in fields){if(!('latitude' in fields))fields.latitude='';if(!('longitude' in fields))fields.longitude='';}
+      await api(`/api/owner/mics/${f.dataset.id}`,{method:'PATCH',body:{fields}});
+      await renderOwner();toast('Changes saved.');
+    }
     if(f.id==='admin-password-form'){if(raw.new_password!==raw.confirm_password)throw Error('New passwords do not match.');await api('/api/admin/password',{method:'POST',body:{current_password:raw.current_password,new_password:raw.new_password}});f.reset();$('#modal').close();await renderAdmin();toast('Password changed. Sign in with your new password.');}
     if(f.id==='admin-login'){await api('/api/login',{method:'POST',body:{password:raw.password}});await renderAdmin();}
     if(f.id==='owner-login'){await api('/api/owner/login',{method:'POST',body:raw});await renderOwner();}
-    if(f.id==='redeem-form'){await api('/api/owner/redeem',{method:'POST',body:{token:f.dataset.token,password:raw.password}});history.replaceState(null,'','/owner');await renderOwner();}
+    if(f.id==='redeem-form'){if(f.dataset.newAccount==='true'&&raw.password!==raw.confirm_password)throw Error('Passwords do not match.');await api('/api/owner/redeem',{method:'POST',body:{token:f.dataset.token,password:raw.password}});history.replaceState(null,'','/owner');await renderOwner();}
     if(f.id==='submission-form'){const result=await api(`/api/mics/${f.dataset.id}/submissions`,{method:'POST',body:{kind:f.dataset.kind,...raw}});$('#modal').close();toast(result.message);}
     if(f.id==='source-form'){
       const config={name:raw.name,url:raw.kind==='upload'?'':raw.url,kind:raw.kind,interval_minutes:Number(raw.interval_minutes),priority:Number(raw.priority),permission_confirmed:raw.permission_confirmed==='on',sheet:raw.sheet,row_selector:raw.row_selector,mapping:JSON.parse(raw.mapping||'{}'),defaults:JSON.parse(raw.defaults||'{}')};let result;
@@ -221,6 +287,7 @@ document.addEventListener('click',async e=>{
   if(window.MICLIST_PREVIEW){const link=e.target.closest('a[href]');if(link&&['/admin','/owner','/'].includes(link.getAttribute('href'))){e.preventDefault();if(link.getAttribute('href')==='/admin'){await renderAdmin();}else if(link.getAttribute('href')==='/owner'){await renderOwner();}else{$('#view-directory').hidden=false;$('#view-sources').hidden=true;renderDirectory();}return;}}
   const day=e.target.closest('[data-day]');if(day){state.day=day.dataset.day==='all'?'all':Number(day.dataset.day);renderDirectory();return;}
   const borough=e.target.closest('[data-borough]');if(borough){state.borough=borough.dataset.borough;renderDirectory();return;}
+  const hostButton=e.target.closest('[data-host-tab]');if(hostButton){hostTab(hostButton.dataset.hostTab);return;}
   const tab=e.target.closest('[data-admin-tab]');if(tab){state.adminTab=tab.dataset.adminTab;$$('[data-admin-tab]').forEach(t=>t.classList.toggle('active',t===tab));renderAdminBody();return;}
   const el=e.target.closest('[data-action]');if(!el)return;const action=el.dataset.action,id=el.dataset.id;e.preventDefault();
   try{
@@ -255,9 +322,11 @@ document.addEventListener('click',async e=>{
     if(action==='admin-refresh')await renderAdmin();
     if(action==='admin-password'){modal('Change admin password',`<form id="admin-password-form">${field('Current password','current_password','','password',true)}${field('New password','new_password','','password',true)}${field('Confirm new password','confirm_password','','password',true)}<p class="form-helper">A long, unique password protects the directory. Changing it signs out all admin sessions.</p><button type="submit" class="button primary">Change password</button></form>`);}
     if(action==='admin-logout'){await api('/api/logout',{method:'POST'});state.admin=null;state.community=null;await renderAdmin();}
-    if(action==='owner-logout'){await api('/api/owner/logout',{method:'POST'});state.owner=null;await renderOwner();}
+    if(action==='owner-refresh')await renderOwner();
+    if(action==='owner-password'){if(hostDirty()){toast('Save your mic changes before changing your password.');return;}modal('Change your password',`<form id="owner-password-form">${field('Current password','current_password','','password',true)}${field('New password (15+ characters)','new_password','','password',true)}${field('Confirm new password','confirm_password','','password',true)}<p class="form-helper">This signs out all your host sessions.</p><button type="submit" class="button primary">Change password</button></form>`);$$('input[name=new_password],input[name=confirm_password]',$('#owner-password-form')).forEach(i=>{i.minLength=15;i.autocomplete='new-password';});}
+    if(action==='owner-logout'){if(hostDirty()&&!confirm('Discard unsaved changes and sign out?'))return;await api('/api/owner/logout',{method:'POST'});state.owner=null;await renderOwner();}
     if(action==='edit-admin')editForm(id,'admin');
-    if(action==='edit-owner')editForm(id,'owner');
+    if(action==='edit-owner'){state.ownerMic=id;await renderOwner();}
     if(action==='mic-new')editForm(null,'admin');
     if(action==='mic-hide'){const r=findMic(id);await api(`/api/admin/mics/${id}/visibility`,{method:'PATCH',body:{hidden:!r.hidden}});await loadPublic();await renderAdmin();}
     if(action==='mic-restore'){if(!confirm('Remove manual/host overrides and use the imported source values again?'))return;await api(`/api/admin/mics/${id}/restore`,{method:'POST'});await loadPublic();await renderAdmin();}
@@ -272,6 +341,7 @@ document.addEventListener('click',async e=>{
   }catch(err){toast(err.message);el.disabled=false;}
 });
 document.addEventListener('change',async e=>{const t=e.target;try{
+  if(t.id==='host-mic-select'){if(hostDirty()&&!confirm('Discard unsaved changes and switch listings?')){t.value=state.ownerMic;return;}state.ownerMic=t.value;renderHostEditor();}
   if(t.id==='day-filter'){state.day=t.value==='all'?'all':Number(t.value);renderDirectory();}
   if(t.id==='borough-filter'){state.borough=t.value;renderDirectory();}
   if(t.id==='time-from'){state.timeFrom=t.value;renderDirectory();}
@@ -283,7 +353,9 @@ document.addEventListener('change',async e=>{const t=e.target;try{
   if(t.dataset.sourceInterval){await api(`/api/sources/${t.dataset.sourceInterval}`,{method:'PATCH',body:{interval_minutes:Number(t.value)}});toast('Refresh interval updated.');await renderAdmin();}
   if(t.dataset.sourcePriority){await api(`/api/sources/${t.dataset.sourcePriority}`,{method:'PATCH',body:{priority:Number(t.value)}});toast('Source priority updated.');await loadPublic();await renderAdmin();}
 }catch(err){toast(err.message);}});
-document.addEventListener('input',e=>{if(e.target.id==='search'){state.search=e.target.value.toLowerCase().trim();renderDirectory();}if(e.target.id==='admin-search')renderAdminMics(e.target.value.toLowerCase().trim());});
+document.addEventListener('invalid',e=>{const panel=e.target.closest('[data-host-panel]');if(panel)hostTab(panel.dataset.hostPanel);},true);
+window.addEventListener('beforeunload',e=>{if(hostDirty()){e.preventDefault();e.returnValue='';}});
+document.addEventListener('input',e=>{if(e.target.closest('#host-edit-form'))$('#host-save-state').textContent=hostDirty()?'Unsaved changes':'Your edits are protected from imports.';if(e.target.id==='search'){state.search=e.target.value.toLowerCase().trim();renderDirectory();}if(e.target.id==='admin-search')renderAdminMics(e.target.value.toLowerCase().trim());});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#site-menu'))$('#site-menu').open=false;if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!$('#modal').open&&location.pathname==='/'){e.preventDefault();$('#search').focus();}});
 $('#modal').addEventListener('click',e=>{if(e.target===$('#modal'))$('#modal').close();});
 async function boot(){

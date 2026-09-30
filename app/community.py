@@ -73,9 +73,16 @@ class Redeem(BaseModel):
     token: str = Field(min_length=30, max_length=150)
     password: str = Field(min_length=1, max_length=128)
 
+class InvitationLookup(BaseModel):
+    token: str = Field(min_length=30, max_length=150)
+
 class OwnerLogin(BaseModel):
     email: str = Field(min_length=3, max_length=254)
     password: str = Field(min_length=1, max_length=128)
+
+class OwnerPasswordUpdate(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=15, max_length=128)
 
 class Edit(BaseModel):
     fields: dict = Field(default_factory=dict)
@@ -262,7 +269,7 @@ def register(app, store, admin, local_dev):
         return {'ok':True}
 
     @app.post('/api/owner/invitation')
-    async def invitation_info(body: Redeem, request: Request):
+    async def invitation_info(body: InvitationLookup, request: Request):
         throttle(request,'invite',20)
         with store.connect() as c:
             r=c.execute("SELECT s.email,s.mic_name,s.state FROM invitations i JOIN submissions s ON s.id=i.submission_id WHERE i.token_hash=? AND i.used IS NULL AND i.expires>? AND s.state='approved'",(token_hash(body.token),time.time())).fetchone()
@@ -296,7 +303,13 @@ def register(app, store, admin, local_dev):
             if c.execute('SELECT 1 FROM ownership WHERE mic_id=?',(invitation['mic_id'],)).fetchone():
                 raise HTTPException(409,'This mic already has an owner.')
             owner_id=existing['id'] if existing else uuid.uuid4().hex
-            if not existing:
+            if existing:
+                # Verification ran outside the transaction. A concurrent password
+                # change must not let the old password activate another claim.
+                current_owner_row=c.execute('SELECT password_hash FROM owners WHERE id=?',(owner_id,)).fetchone()
+                if not current_owner_row or current_owner_row['password_hash']!=existing['password_hash']:
+                    raise HTTPException(401,'Your host credentials changed. Sign in again.')
+            else:
                 if c.execute('SELECT 1 FROM owners WHERE email=?',(invitation['email'],)).fetchone():
                     raise HTTPException(409,'Account created in another session. Try again with its password.')
                 c.execute('INSERT INTO owners VALUES (?,?,?,?,?)',(owner_id,invitation['email'],invitation['name'],encoded,time.time()))
@@ -317,8 +330,37 @@ def register(app, store, admin, local_dev):
         if not owner or not valid:
             raise HTTPException(401,'Email or password is incorrect.')
         with store.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
+            current=c.execute('SELECT password_hash FROM owners WHERE id=? AND EXISTS (SELECT 1 FROM ownership WHERE owner_id=?)',(owner['id'],owner['id'])).fetchone()
+            if not current or current['password_hash']!=owner['password_hash']:
+                raise HTTPException(401,'Your host credentials changed. Sign in again.')
             owner_cookie(c,owner['id'],response)
         return {'ok':True}
+
+    @app.post('/api/owner/password')
+    async def change_password(body: OwnerPasswordUpdate, request: Request, response: Response, owner=Depends(current_owner)):
+        # Password confirmation and login share one attempt budget.
+        throttle(request,'owner-login',8)
+        with store.connect() as c:
+            previous=c.execute('SELECT password_hash FROM owners WHERE id=?',(owner['id'],)).fetchone()
+        if not previous or not await asyncio.to_thread(verify_password,body.current_password,previous['password_hash']):
+            raise HTTPException(401,'Your current password is incorrect.')
+        replacement=await asyncio.to_thread(hash_password,body.new_password)
+        with store.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
+            current=c.execute('''SELECT o.password_hash FROM owners o JOIN owner_sessions s ON s.owner_id=o.id
+                                 WHERE o.id=? AND s.token_hash=? AND s.expires>?
+                                 AND EXISTS (SELECT 1 FROM ownership m WHERE m.owner_id=o.id)''',
+                              (owner['id'],token_hash(request.cookies.get('miclist_owner','')),time.time())).fetchone()
+            # The stored hash is the credential generation. Recheck it and the
+            # session atomically so only one concurrent password change wins.
+            if not current or current['password_hash']!=previous['password_hash']:
+                raise HTTPException(401,'Your host credentials changed. Sign in again.')
+            c.execute('UPDATE owners SET password_hash=? WHERE id=?',(replacement,owner['id']))
+            c.execute('DELETE FROM owner_sessions WHERE owner_id=?',(owner['id'],))
+            record(c,None,owner['id'],'password-changed')
+        response.delete_cookie('miclist_owner',path='/')
+        return {'ok':True,'signin_required':True}
 
     @app.post('/api/owner/logout')
     async def logout(request: Request,response: Response):
@@ -329,9 +371,10 @@ def register(app, store, admin, local_dev):
 
     @app.get('/api/owner/me')
     async def me(owner=Depends(current_owner)):
+        listings=store.public_data(include_hidden=True)['listings']
         with store.connect() as c:
             ids={r[0] for r in c.execute('SELECT mic_id FROM ownership WHERE owner_id=?',(owner['id'],))}
-        return {**owner,'listings':[r for r in store.public_data(include_hidden=True)['listings'] if r['id'] in ids]}
+        return {**owner,'listings':[r for r in listings if r['id'] in ids]}
 
     @app.patch('/api/owner/mics/{mic_id}')
     async def edit_owned(mic_id: str, body: Edit, owner=Depends(current_owner)):
@@ -373,12 +416,18 @@ def register(app, store, admin, local_dev):
     async def revoke(mic_id: str):
         with store.connect() as c:
             c.execute('BEGIN IMMEDIATE')
-            owner=c.execute('SELECT owner_id FROM ownership WHERE mic_id=?',(mic_id,)).fetchone()
-            c.execute('DELETE FROM ownership WHERE mic_id=?',(mic_id,))
+            owner=c.execute('SELECT owner_id,claim_id FROM ownership WHERE mic_id=?',(mic_id,)).fetchone()
+            if owner:
+                # Recurring dates share one approved claim, so revocation must
+                # cover its whole family without touching separately approved mics.
+                c.execute('DELETE FROM ownership WHERE claim_id=?',(owner['claim_id'],))
+                c.execute("UPDATE submissions SET state='revoked' WHERE id=? AND kind='claim'",(owner['claim_id'],))
+                c.execute('DELETE FROM invitations WHERE submission_id=?',(owner['claim_id'],))
+            else:
+                c.execute('DELETE FROM invitations WHERE submission_id IN (SELECT id FROM submissions WHERE mic_id=? AND kind=\'claim\' AND state IN (\'approved\',\'activated\'))',(mic_id,))
+                c.execute("UPDATE submissions SET state='revoked' WHERE mic_id=? AND kind='claim' AND state IN ('approved','activated')",(mic_id,))
             if owner and not c.execute('SELECT 1 FROM ownership WHERE owner_id=?',(owner['owner_id'],)).fetchone():
                 c.execute('DELETE FROM owner_sessions WHERE owner_id=?',(owner['owner_id'],))
                 c.execute('DELETE FROM owners WHERE id=?',(owner['owner_id'],))
-            c.execute("UPDATE submissions SET state='revoked' WHERE mic_id=? AND kind='claim' AND state IN ('approved','activated')",(mic_id,))
-            c.execute('DELETE FROM invitations WHERE submission_id IN (SELECT id FROM submissions WHERE mic_id=?)',(mic_id,))
             record(c,mic_id,'admin','owner-revoked')
         return {'ok':True}

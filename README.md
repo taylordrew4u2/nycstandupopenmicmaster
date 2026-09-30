@@ -3,10 +3,9 @@
 A working, self-hosted open-mic directory with a source manager, automatic polling,
 a five-borough map, public corrections, moderated claims, and scoped host accounts.
 
-**Hosting status:** the app is configured for Vercel with hosted PostgreSQL and
-scheduled source checks. A public deployment and database still need to be connected;
-the Vercel sign-in step has not been completed. No real mic sources are connected.
-The standalone preview contains explicitly fictional listings.
+**Hosting:** the production site uses Vercel, hosted PostgreSQL, and scheduled
+Badslava and Comediq source checks. The standalone preview contains explicitly
+fictional listings and does not support real accounts.
 
 ## Start on your Mac
 
@@ -111,10 +110,26 @@ silently changes the listing.
 3. Approval creates a one-use signup link, valid for seven days. **Copy and send it to the
    verified host yourself. The app does not send email.**
 4. The host opens the link and creates an account with a password of at least 15 characters.
-5. Their account can edit only the specific mic you approved. Access is checked on every write.
+5. Their account can edit only the mic you approved. Access is checked on every write.
 6. They return through `/owner`. An existing host can use another approved invitation
    to attach a second mic to the same account after entering their current password.
 7. You can revoke access, hide the mic, edit it yourself, or restore imported values.
+
+The compact host dashboard has **Mic**, **When**, **Where**, and **Hosts** sections,
+a last-updated timestamp, and a public-listing link. Hosts can update names, fees,
+times, venue and pin details, notes, host names, social URLs, and signup links.
+Edits stay in the form when switching sections; **Save changes** publishes them.
+Hosts have separate passwords from the site administrator. **Password** requires
+their current password, accepts a new password of at least 15 characters, and
+signs out all their host sessions.
+
+For supported Badslava and Comediq feeds, an exact provider mic ID carries an active
+claim into later dated occurrences. New occurrences inherit persistent host details
+without copying one-date cancellations, date overrides, or skipped dates. Dates
+remain separately editable. Existing administrator edits are preserved. Ambiguous
+provider identities require review instead of automatically extending access.
+Revoking any occurrence removes the whole approved claim's recurring access while
+leaving separately approved mics alone.
 
 Invitation tokens and sessions are hashed in the database. Claim links put the token in
 an URL fragment so it is not included in ordinary HTTP access logs. Links are single-use;

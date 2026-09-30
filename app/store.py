@@ -62,6 +62,35 @@ def venue_slot(payload):
         return None
     return address, key(payload.get('borough','')), payload['date'], payload['start_time']
 
+
+RECURRING_OWNER_FIELDS = {
+    'name', 'venue', 'address', 'borough', 'neighborhood', 'start_time', 'signup_time',
+    'signup_url', 'signup_method', 'cost', 'cost_text', 'purchase_minimum', 'set_minutes',
+    'host_names', 'host_socials', 'notes', 'latitude', 'longitude',
+}
+
+
+def recurring_source_key(source, payload):
+    """Only provider-issued mic IDs establish a series, never listing text."""
+    from .badslava import supports as badslava_source
+    from .comediq import supports as comediq_source
+    config = source['config']
+    if config.get('kind') == 'upload':
+        return None
+    external_id = str(payload.get('external_id') or '')
+    if badslava_source(config.get('url', '')):
+        matched = re.fullmatch(r'badslava:(\d+):(\d{4}-\d{2}-\d{2})', external_id)
+        provider = 'badslava'
+    elif comediq_source(config.get('url', '')):
+        matched = re.fullmatch(r'comediq:([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}):(\d{4}-\d{2}-\d{2})', external_id)
+        provider = 'comediq'
+    else:
+        return None
+    if not matched or matched[2] != payload.get('date'):
+        return None
+    # A newly connected source is a separate authority even if its URL matches.
+    return source['id'], provider, matched[1]
+
 class Store:
     def __init__(self, path):
         self.path = str(path)
@@ -306,8 +335,33 @@ class Store:
             group_key = ('known:' + known[0]) if known else identity
             stable_groups.setdefault(group_key, []).extend(items)
         final_groups = stable_groups
-        listings = []
+        # Register occurrence IDs before following an approved provider mic into
+        # later dates. Dates remain independent public records and edit targets.
+        occurrence_ids = {}
+        recurring_members = defaultdict(set)
         registry_new = []
+        for identity, items in final_groups.items():
+            known = [registry[(o['source_id'], o['remote_key'])] for o, _, _ in items
+                     if (o['source_id'], o['remote_key']) in registry]
+            mic_id = next((x for x in known if x in owners), known[0] if known else digest(identity)[:24])
+            occurrence_ids[identity] = mic_id
+            series_keys = {series for _, payload, source in items
+                           if (series := recurring_source_key(source, payload))}
+            ambiguous_sources = {source_id for source_id, count in
+                                 Counter(series[0] for series in series_keys).items() if count > 1}
+            for o, payload, source in items:
+                registry_new.append((o['source_id'], o['remote_key'], mic_id))
+                series = recurring_source_key(source, payload)
+                if series and source['id'] not in ambiguous_sources:
+                    recurring_members[series].add(mic_id)
+        with self.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
+            c.executemany('INSERT INTO mic_registry VALUES (?,?,?) ON CONFLICT(source_id,remote_key) DO UPDATE SET mic_id=excluded.mic_id', registry_new)
+            self._inherit_recurring_ownership(c, recurring_members)
+            # Read after reconciliation and under the same lock as revocation.
+            owners = {r['mic_id']: r['owner_id'] for r in c.execute('SELECT * FROM ownership')}
+            overlays = {r['mic_id']: dict(r) for r in c.execute('SELECT * FROM overlays')}
+        listings = []
         conflict_fields = ['start_time', 'signup_time', 'cost', 'purchase_minimum', 'set_minutes', 'status', 'address']
         for identity, items in final_groups.items():
             # Published value comes from the configured source priority, never silent recency guessing.
@@ -328,10 +382,7 @@ class Store:
             stale = now - observation['last_seen'] > max(86400, source['config']['interval_minutes'] * 240)
             stale = stale or observation['missing_count'] > 0 or (not source['enabled'] and source['config']['kind'] != 'upload')
             # A stable ID keeps owner permissions attached when the source edits its title.
-            known = [registry[(o['source_id'],o['remote_key'])] for o,_,_ in items if (o['source_id'],o['remote_key']) in registry]
-            mic_id = next((x for x in known if x in owners), known[0] if known else digest(identity)[:24])
-            for o,_,_ in items:
-                registry_new.append((o['source_id'],o['remote_key'],mic_id))
+            mic_id = occurrence_ids[identity]
             hidden = bool(flags.get(mic_id,False))
             if hidden and not include_hidden:
                 continue
@@ -360,10 +411,53 @@ class Store:
                              'overridden_fields':list(json.loads(curated['payload'])) if curated else [],
                              'checked_at': observation['last_seen'], 'updated_at': observation['updated'],
                              'conflicts': conflicts, 'stale': bool(stale), 'host_confirmed_at': host_confirmed})
-        with self.connect() as c:
-            c.executemany('INSERT INTO mic_registry VALUES (?,?,?) ON CONFLICT(source_id,remote_key) DO UPDATE SET mic_id=excluded.mic_id', registry_new)
         return {'listings': listings, 'source_count': len(sources), 'last_check': max((s['last_success'] or 0 for s in sources.values()), default=None),
                 'timezone': 'America/New_York', 'mode': 'live' if sources else 'empty'}
+
+    def _inherit_recurring_ownership(self, c, members):
+        """Extend active grants; deleting a claim's grants prevents resurrection.
+
+        Call only while holding the shared write lock. Source observations are
+        retained after a rollover, which keeps the original approved connection
+        available without trusting names, venues, or cross-source similarities.
+        """
+        ownership = {r['mic_id']: dict(r) for r in c.execute('SELECT * FROM ownership')}
+        if not ownership or not members:
+            return
+        candidates = defaultdict(set)
+        blocked = set()
+        for ids in members.values():
+            grants = {(ownership[m]['owner_id'], ownership[m]['claim_id']) for m in ids if m in ownership}
+            if len(grants) > 1:
+                blocked.update(ids)
+            elif grants:
+                for mic_id in ids - ownership.keys():
+                    candidates[mic_id].update(grants)
+        overlays = [dict(r) for r in c.execute('SELECT * FROM overlays ORDER BY updated')]
+        family_edits = {}
+        for overlay in overlays:
+            grant = ownership.get(overlay['mic_id'])
+            if not grant or overlay['actor'] != grant['owner_id']:
+                continue
+            family = (grant['owner_id'], grant['claim_id'])
+            patch, updated = family_edits.setdefault(family, ({}, 0))
+            persistent = {k: v for k, v in json.loads(overlay['payload']).items() if k in RECURRING_OWNER_FIELDS}
+            if persistent:
+                patch.update(persistent)
+                family_edits[family] = (patch, max(updated, overlay['updated']))
+        existing_overlays = {r['mic_id'] for r in overlays}
+        for mic_id, grants in candidates.items():
+            if mic_id in blocked or len(grants) != 1:
+                continue
+            owner_id, claim_id = next(iter(grants))
+            approved = min(r['approved'] for r in ownership.values()
+                           if r['owner_id'] == owner_id and r['claim_id'] == claim_id)
+            c.execute('INSERT INTO ownership VALUES (?,?,?,?)', (mic_id, owner_id, approved, claim_id))
+            # Existing occurrence edits (especially administrator corrections)
+            # are never replaced by inherited host defaults.
+            patch, updated = family_edits.get((owner_id, claim_id), ({}, 0))
+            if patch and mic_id not in existing_overlays:
+                c.execute('INSERT INTO overlays VALUES (?,?,?,?)', (mic_id, json.dumps(patch), updated, owner_id))
 
     def review_rows(self):
         with self.connect() as c:

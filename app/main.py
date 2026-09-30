@@ -137,6 +137,9 @@ def create_app(db_path=None):
         })
         if request.url.path.startswith('/api/'):
             response.headers['Cache-Control'] = 'no-store'
+        if request.url.path in ('/admin', '/owner', '/claim'):
+            response.headers['Cache-Control'] = 'no-store'
+            response.headers['X-Robots-Tag'] = 'noindex, nofollow'
         return response
 
     def admin(request: Request):
