@@ -301,4 +301,4 @@ it directly in Vercel Domains (registrar URL forwarding is not a custom-domain
 connection). The production server explicitly accepts the custom origin during
 migration from its configured Vercel origin; unrelated origins remain blocked. Set production `PUBLIC_ORIGIN=https://nycopenmicmasterlist.com`
 and redeploy. Verify host/admin sign-in and mic submissions on the custom domain.
-The scheduled source checker continues using its existing direct deployment URL.
+The scheduled source checker uses the same custom domain in `deployment.json`.
