@@ -170,9 +170,15 @@ async function renderAdmin(){
     if(!session.authenticated){root.innerHTML=`<div class="login-panel"><div class="eyebrow">PRIVATE / ADMINISTRATOR</div><h2>One place to run it all.</h2><p>Manage sources, corrections, claims, host access and every listing.</p>${!session.configured?'<p class="security-warning">Set ADMIN_PASSWORD on the server to enable this panel.</p>':''}<form id="admin-login">${field('Admin password','password','','password',true)}<button class="button primary" type="submit">Sign in ↗</button></form><p class="community-link">Run a mic? <a href="/owner">Host login</a></p></div>`;return;}
     const [admin,community]=await Promise.all([api('/api/sources'),api('/api/admin/community')]);state.admin=admin;state.community=community;
     const claims=community.submissions.filter(s=>s.kind==='claim'&&s.state==='pending').length,fixes=community.submissions.filter(s=>s.kind==='fix'&&s.state==='pending').length,newMics=(community.proposals||[]).filter(s=>s.state==='pending').length,reports=community.submissions.filter(s=>s.kind==='report'&&s.state==='pending').length;
-    root.innerHTML=`<div class="admin-heading"><div><div class="eyebrow">YOUR DIRECTORY / YOUR CONTROL</div><h1>The control room<span class="red-period">.</span></h1><p>Good information in. More stage time out.</p></div><div class="admin-buttons">${button('Add source ↗','add-source','','primary')}${button('Password','admin-password')}${button('Sign out','admin-logout')}</div></div>${session.weak_password?'<p class="security-warning">Your administrator password is short and easy to guess. Use Password to change it.</p>':''}<div class="stats-grid"><div class="stat"><div class="eyebrow">CONNECTED SOURCES</div><strong>${admin.sources.length}</strong><p>${admin.sources.filter(s=>s.enabled).length} scheduled</p></div><div class="stat"><div class="eyebrow">PUBLISHED MICS</div><strong>${community.listings.filter(r=>!r.hidden).length}</strong><p>${community.listings.filter(r=>!Number.isFinite(r.latitude)).length} need a map pin</p></div><div class="stat"><div class="eyebrow">AWAITING REVIEW</div><strong>${claims+fixes+newMics+reports}</strong><p>${newMics} new mics · ${claims} claims · ${fixes} fixes · ${reports} reports</p></div></div><div class="admin-tabs">${[['sources','Sources'],['proposals',`New mics (${newMics})`],['reports',`Reports (${reports})`],['fixes',`Corrections (${fixes})`],['claims',`Claims (${claims})`],['owners','Host access'],['mics','All mics'],['activity','Activity'],['about','About page']].map(([v,t])=>`<button data-admin-tab="${v}" class="${state.adminTab===v?'active':''}">${t}</button>`).join('')}</div><div id="admin-body"></div>`;
-    renderAdminBody();
+    root.innerHTML=`<div class="admin-heading"><div><div class="eyebrow">YOUR DIRECTORY / YOUR CONTROL</div><h1>The control room<span class="red-period">.</span></h1><p>Good information in. More stage time out.</p></div><div class="admin-buttons">${button('Add source ↗','add-source','','primary')}${button('Password','admin-password')}${button('Sign out','admin-logout')}</div></div>${session.weak_password?'<p class="security-warning">Your administrator password is short and easy to guess. Use Password to change it.</p>':''}<div class="stats-grid"><div class="stat"><div class="eyebrow">CONNECTED SOURCES</div><strong>${admin.sources.length}</strong><p>${admin.sources.filter(s=>s.enabled).length} scheduled</p></div><div class="stat"><div class="eyebrow">PUBLISHED MICS</div><strong>${community.listings.filter(r=>!r.hidden).length}</strong><p>${community.listings.filter(r=>!Number.isFinite(r.latitude)).length} need a map pin</p></div><div class="stat"><div class="eyebrow">AWAITING REVIEW</div><strong>${claims+fixes+newMics+reports}</strong><p>${newMics} new mics · ${claims} claims · ${fixes} fixes · ${reports} reports</p></div></div><div id="visitor-stats" class="visitor-stats" aria-label="Visitor statistics">Loading visitor counts…</div><div class="admin-tabs">${[['sources','Sources'],['proposals',`New mics (${newMics})`],['reports',`Reports (${reports})`],['fixes',`Corrections (${fixes})`],['claims',`Claims (${claims})`],['owners','Host access'],['mics','All mics'],['activity','Activity'],['about','About page']].map(([v,t])=>`<button data-admin-tab="${v}" class="${state.adminTab===v?'active':''}">${t}</button>`).join('')}</div><div id="admin-body"></div>`;
+    renderAdminBody();loadVisitorStats();
   }catch(err){root.innerHTML=blank('Admin could not load.',esc(err.message),button('Retry','admin-refresh'));}
+}
+async function loadVisitorStats(){
+  const box=$('#visitor-stats');if(!box)return;
+  try{const v=await api('/api/admin/visitors');if(!box.isConnected)return;
+    box.innerHTML=`<div class="visitor-heading"><strong>Visitors</strong><button class="compact-button" data-action="visitors-refresh">Refresh</button></div><div class="visitor-counts">${[['today','Today'],['week','Last 7 days'],['month','Last 30 days'],['total','Since tracking began']].map(([key,label])=>`<div><strong>${Number(v[key]).toLocaleString()}</strong><span>${label}</span></div>`).join('')}</div><small>Estimated unique browsers · New York time · Tracking since ${esc(new Date(v.started_at*1000).toLocaleDateString('en-US',{timeZone:'America/New_York'}))}. Repeat visits count once per period. No IP addresses stored.</small>`;
+  }catch{box.innerHTML='Visitor counts unavailable. '+button('Retry','visitors-refresh');}
 }
 async function renderAdminBody(){const root=$('#admin-body'),a=state.admin,c=state.community;if(!root)return;
   if(state.adminTab==='about'){
@@ -363,6 +369,7 @@ document.addEventListener('click',async e=>{
   const tab=e.target.closest('[data-admin-tab]');if(tab){if(tab.dataset.adminTab===state.adminTab)return;if(aboutDirty()&&!confirm('Discard unsaved About page changes?'))return;state.adminTab=tab.dataset.adminTab;$$('[data-admin-tab]').forEach(t=>t.classList.toggle('active',t===tab));renderAdminBody();return;}
   const el=e.target.closest('[data-action]');if(!el)return;const action=el.dataset.action,id=el.dataset.id;e.preventDefault();
   try{
+    if(action==='visitors-refresh')await loadVisitorStats();
     if(action==='proposal-refresh')await renderProposalStatus();
     if(action==='copy-proposal-link'){try{await navigator.clipboard.writeText(location.href);toast('Private status link copied.');}catch{$('#proposal-status-link').focus();$('#proposal-status-link').select();toast('Select and copy your private link.');}}
     if(action==='close')$('#modal').close();
@@ -374,6 +381,12 @@ document.addEventListener('click',async e=>{
     if(action==='filters')filtersDialog();
     if(action==='previous-page'||action==='next-page'){state.page+=action==='next-page'?1:-1;renderCards();}
     if(action==='detail-tab')details(id,el.dataset.tab,Number(el.dataset.page||0));
+    if(action==='map-toggle'){
+      const collapsed=$('.directory-layout').classList.toggle('map-collapsed');
+      el.textContent=collapsed?'Show map':'Hide map';
+      el.setAttribute('aria-expanded',String(!collapsed));
+      map?.hide();
+    }
     if(action==='map-reset')map?.reset();
     if(action==='details')details(id);
     if(action==='copy-mic-link'){

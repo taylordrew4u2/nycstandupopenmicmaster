@@ -302,3 +302,16 @@ connection). The production server explicitly accepts the custom origin during
 migration from its configured Vercel origin; unrelated origins remain blocked. Set production `PUBLIC_ORIGIN=https://nycopenmicmasterlist.com`
 and redeploy. Verify host/admin sign-in and mic submissions on the custom domain.
 The scheduled source checker uses the same custom domain in `deployment.json`.
+
+### Visitor counts
+
+The main admin dashboard shows estimated unique browsers today, in the last seven
+and thirty New York calendar days (including today), and since tracking started.
+`/` and `/about` send one first-party count request per visible page load. A random
+HttpOnly, SameSite=Lax cookie lasts one year; only its SHA-256 hash, first-seen and
+last-seen timestamps are stored. No IPs, identities or page histories are stored.
+Signed-in admin/host browsers, obvious bot user agents, and browsers requesting
+Do Not Track or Global Privacy Control are excluded. Clearing
+cookies or using multiple devices can count a person more than once; these are
+approximate visitor counts, not authenticated people. No historical visits are
+backfilled. The counts use the existing database and no paid analytics service.

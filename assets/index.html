@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/assets/styles.css">
   <script src="/assets/map.js" defer></script>
   <script src="/assets/app.js" defer></script>
+<script src="/assets/visitors.js" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to mics</a>
@@ -34,7 +35,7 @@
       <button id="more-filters" class="compact-button" data-action="filters">Filters</button>
     </div>
     <div class="directory-layout">
-      <section class="map-panel" aria-label="NYC open mic map">
+      <section id="map-panel" class="map-panel" aria-label="NYC open mic map">
         <div id="nyc-map" class="city-map" role="region" aria-label="Interactive NYC map. Drag to pan, pinch or double tap to zoom, or use the zoom buttons">
           <div class="tile-plane"></div><div class="pin-plane"></div>
           <div class="map-controls"><button type="button" data-map="in" aria-label="Zoom in">+</button><button type="button" data-map="out" aria-label="Zoom out">−</button><button type="button" class="map-reset" data-action="map-reset" aria-label="Show all NYC" title="Show all NYC">NYC</button></div>
@@ -44,7 +45,7 @@
         </div>
       </section>
       <section class="results" aria-label="Matching mics">
-        <div class="results-toolbar"><p id="result-count" role="status" aria-live="polite"></p><div class="list-pagination" aria-label="Listing pages"><button class="compact-button" data-action="previous-page" aria-label="Previous page">‹</button><span id="page-count" aria-live="polite"></span><button class="compact-button" data-action="next-page" aria-label="Next page">›</button></div></div>
+        <div class="results-toolbar"><p id="result-count" role="status" aria-live="polite"></p><button id="map-toggle" class="compact-button" data-action="map-toggle" aria-controls="map-panel" aria-expanded="true">Hide map</button><div class="list-pagination" aria-label="Listing pages"><button class="compact-button" data-action="previous-page" aria-label="Previous page">‹</button><span id="page-count" aria-live="polite"></span><button class="compact-button" data-action="next-page" aria-label="Next page">›</button></div></div>
         <div id="cards" class="mic-list"></div>
       </section>
     </div>

@@ -150,6 +150,9 @@ def create_app(db_path=None):
     def admin(request: Request):
         return auth.session(request.cookies.get('miclist_session', ''))
 
+    from .analytics import register as register_analytics
+    register_analytics(app, store, admin, local_dev)
+
     def admin_ip(request: Request):
         return hashlib.sha256((request.client.host if request.client else 'unknown').encode()).hexdigest()
 

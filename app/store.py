@@ -123,6 +123,9 @@ class Store:
                 conn.executescript(SCHEMA)
                 from .community import SCHEMA as COMMUNITY_SCHEMA
                 conn.executescript(COMMUNITY_SCHEMA)
+                from .analytics import SCHEMA as ANALYTICS_SCHEMA
+                conn.executescript(ANALYTICS_SCHEMA)
+                conn.execute("INSERT INTO meta(key,value) VALUES ('visitor_tracking_started',?) ON CONFLICT(key) DO NOTHING", (str(time.time()),))
                 conn.commit()
                 self._ready = True
             except Exception:
