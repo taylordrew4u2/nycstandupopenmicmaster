@@ -1,0 +1,128 @@
+[
+  {
+    "name": "New York Comedy Club",
+    "url": "https://newyorkcomedyclub.com/open-mic",
+    "note": "Weekly mic schedule; includes Midtown and East Village.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Comic Strip Live",
+    "url": "https://comicstriplive.com/",
+    "note": "Weekly mic rows only; excludes regular shows and classes.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "BK Made Comedy",
+    "url": "https://www.bkmadecomedy.com/",
+    "note": "Explicit open-mic banner only.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "EastVille Comedy Club",
+    "url": "https://www.eastvillecomedy.com/pages/open-mics",
+    "note": "Weekly mic schedule; signup details vary by host.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "QED Astoria",
+    "url": "https://qedastoria.com/collections/open-mic-nights",
+    "note": "Weekly schedule; excludes the monthly poetry-only mic.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Comedy Mob / Rodney\u2019s",
+    "url": "https://comedymob.com/",
+    "note": "Weekly open-mic section only; excludes bringer showcases.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "The Comedy Shop",
+    "url": "https://www.comedyshopnyc.com/location/comedy-shop-nyc/",
+    "note": "Official FAQ gives daily mic times.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Bushwick Comedy Club",
+    "url": "https://www.bushwickcomedy.com/open-mics",
+    "note": "Dated venue calendar.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Greenpoint Comedy Club",
+    "url": "https://www.greenpointcomedyclub.com/openmic",
+    "note": "Review: weekly schedule is posted on Instagram, not this page.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "The Tiny Cupboard",
+    "url": "https://tinycupboardgames.com/open-mic",
+    "note": "Review: signup calendar requires JavaScript; no safe structured schedule imported.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Flop House Comedy Club",
+    "url": "https://flophousecomedy.com/",
+    "note": "Review: site requires JavaScript; no structured schedule imported.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Brooklyn Comedy Collective",
+    "url": "https://www.brooklyncc.com/show-schedule",
+    "note": "Review: separate stand-up mics from improv jams and regular shows.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "West Side Comedy Club",
+    "url": "https://www.westsidecomedyclub.com/",
+    "note": "Review: current site did not expose a usable open-mic schedule. Legacy mic page may be outdated.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Broadway Comedy Club",
+    "url": "https://www.broadwaycomedyclub.com/",
+    "note": "Review: Industry Room advertises an open-mic show, but its producer says it is not an open mic.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Fear City Comedy Club",
+    "url": "https://www.thefearcitycomedyclub.com/open-mics",
+    "note": "Review: late mic varies between 9 and 10; current schedules posted on Instagram.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Grisly Pear",
+    "url": "https://www.grislypearstandup.com/open-mic",
+    "note": "Review: follow the club\u2019s open calendar and verify both locations.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Comedy in Harlem",
+    "url": "https://www.comedyinharlem.com/pages/open-mic",
+    "note": "Review: mic schedules are image flyers; dates and recurrence need confirmation.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Grove 34",
+    "url": "https://grove34.com/about",
+    "note": "Review: official club identified; no confirmed public recurring mic schedule found.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Sesh Comedy",
+    "url": "https://seshcomedy.com/",
+    "note": "Review: official site identified; distinguish current mics from showcases.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "Stand Up NY",
+    "url": "https://standupny.com/",
+    "note": "Review: venue moved to Times Square; old Upper West Side mic schedules are not reliable.",
+    "reviewed_at": "2026-09-30"
+  },
+  {
+    "name": "St. Marks Comedy Club",
+    "url": "https://www.stmarkscomedy.com/",
+    "note": "Review: verify current dated club/producer signup calendar.",
+    "reviewed_at": "2026-09-30"
+  }
+]

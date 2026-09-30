@@ -191,3 +191,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
  .directory-layout.map-collapsed{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
  .directory-layout.map-collapsed>.map-panel{display:none}
 }
+
+.biweekly-mic{border-left:3px solid #7c3ca3!important}
+.biweekly-badge{font-size:9px;color:#652787;background:#f1e7f8;padding:1px 3px;white-space:nowrap}
+.mic-pin.biweekly-pin{color:#7c3ca3!important}
+.club-review{margin-top:16px}.club-review>summary{cursor:pointer;font-weight:bold;padding:8px}
+.mic-pin.mixed-biweekly-pin .pin-shape{stroke:#7c3ca3;stroke-width:3}
