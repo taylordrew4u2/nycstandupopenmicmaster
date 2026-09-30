@@ -25,7 +25,7 @@ async function api(path,options={}){
 }
 let toastTimer;
 function toast(message){const t=$('#toast');t.textContent=message;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,6500);}
-function modal(title,body,foot='',eyebrow='NYC Stand Up Open Mic Master'){
+function modal(title,body,foot='',eyebrow='NYC Open Mic Master List'){
   $('#modal').removeAttribute('data-view');
   $('#modal-content').innerHTML=`<div class="modal-head"><div><div class="eyebrow muted">${esc(eyebrow)}</div><h2>${esc(title)}</h2></div><button class="close-button" data-action="close" aria-label="Close dialog">×</button></div><div class="modal-body">${body}</div>${foot?`<div class="modal-foot">${foot}</div>`:''}`;
   if(!$('#modal').open)$('#modal').showModal();
@@ -222,7 +222,7 @@ function renderHostEditor(){
   const f=$('#host-edit-form');f.dataset.original=JSON.stringify(Object.fromEntries(new FormData(f)));hostTab(state.ownerTab||'mic');
 }
 async function renderOwner(){
-  $('#view-directory').hidden=true;$('#view-sources').hidden=false;const root=$('#view-sources');root.classList.add('host-page');document.title='Host dashboard | NYC Stand Up Open Mic Master';
+  $('#view-directory').hidden=true;$('#view-sources').hidden=false;const root=$('#view-sources');root.classList.add('host-page');document.title='Host dashboard | NYC Open Mic Master List';
   try{
     state.owner=await api('/api/owner/me');
     const rows=state.owner.listings.slice().sort((a,b)=>Number(!!(a.date&&a.date<nyToday()))-Number(!!(b.date&&b.date<nyToday()))||(nextDate(a)+a.start_time).localeCompare(nextDate(b)+b.start_time));
@@ -238,7 +238,7 @@ async function renderOwner(){
   }
 }
 async function renderClaim(){
-  $('#view-directory').hidden=true;$('#view-sources').hidden=false;const root=$('#view-sources');const token=location.hash.slice(1);root.classList.add('host-page');document.title='Set up host access | NYC Stand Up Open Mic Master';
+  $('#view-directory').hidden=true;$('#view-sources').hidden=false;const root=$('#view-sources');const token=location.hash.slice(1);root.classList.add('host-page');document.title='Set up host access | NYC Open Mic Master List';
   if(!token){root.innerHTML=blank('An invitation is required.','Use the one-use signup link shared by the administrator after your mic claim is approved.');return;}
   try{const info=await api('/api/owner/invitation',{method:'POST',body:{token}});root.innerHTML=`<div class="login-panel"><div class="eyebrow">YOUR CLAIM WAS APPROVED</div><h2>${info.existing_account?'Connect this mic.':'Create your host login.'}</h2><p>${esc(info.mic_name)}</p><p class="notice-inline">Account email: ${esc(info.email)}</p><form id="redeem-form">${field(info.existing_account?'Your existing account password':'Choose a password (15+ characters)','password','','password',true)}${info.existing_account?'':field('Confirm password','confirm_password','','password',true)}<button type="submit" class="button primary">${info.existing_account?'Add mic to my account':'Create account & edit my mic'} ↗</button></form></div>`;$('#redeem-form').dataset.token=token;$('#redeem-form').dataset.newAccount=String(!info.existing_account);if(!info.existing_account)$$('input[type=password]',$('#redeem-form')).forEach(i=>{i.autocomplete='new-password';i.minLength=15;});
   }catch(err){root.innerHTML=blank('This invitation cannot be used.',esc(err.message));}
@@ -293,7 +293,7 @@ document.addEventListener('click',async e=>{
   try{
     if(action==='close')$('#modal').close();
     if(action==='how')how();
-    if(action==='donate'){modal('Donate','<p>Support NYC Stand Up Open Mic Master.</p><div class="donation-options"><button class="button quiet" disabled>Cash App</button><button class="button quiet" disabled>Venmo</button></div><p class="form-helper">Donation links coming soon.</p>');}
+    if(action==='donate'){modal('Donate','<p>Support NYC Open Mic Master List.</p><div class="donation-options"><button class="button quiet" disabled>Cash App</button><button class="button quiet" disabled>Venmo</button></div><p class="form-helper">Donation links coming soon.</p>');}
 
     if(action==='refresh'){await loadPublic();toast('Loaded the latest saved listings.');}
     if(action==='reset'){Object.assign(state,{day:'all',borough:'all',search:'',cost:'all',signup:'all',timeFrom:'',timeTo:''});$('#search').value='';if($('#cost'))$('#cost').value='all';if($('#signup-filter'))$('#signup-filter').value='all';if($('#time-from'))$('#time-from').value='';if($('#time-to'))$('#time-to').value='';renderDirectory();}

@@ -107,7 +107,7 @@ def create_app(db_path=None):
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    app = FastAPI(title='NYC Stand Up Open Mic Master', version='1.0.0', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title='NYC Open Mic Master List', version='1.0.0', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store = store
     app.state.fetcher = fetcher
     app.state.sync_one = sync_one

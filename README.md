@@ -1,4 +1,4 @@
-# NYC Stand Up Open Mic Master
+# NYC Open Mic Master List
 
 A working, self-hosted open-mic directory with a source manager, automatic polling,
 a five-borough map, public corrections, moderated claims, and scoped host accounts.
