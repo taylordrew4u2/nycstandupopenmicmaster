@@ -20,7 +20,7 @@
   {
     "name": "EastVille Comedy Club",
     "url": "https://www.eastvillecomedy.com/pages/open-mics",
-    "note": "Weekly mic schedule; signup details vary by host.",
+    "note": "Review: live schedule has an ambiguous time row; import paused to avoid publishing a partial or incorrect schedule.",
     "reviewed_at": "2026-09-30"
   },
   {

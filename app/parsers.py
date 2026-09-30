@@ -274,8 +274,10 @@ def normalize_rows(raw_rows, config):
             if minutes is not None and not 1 <= minutes <= 90:
                 minutes = None
             frequency = clean(mapped['frequency']).lower()
-            if frequency not in ('', 'weekly', 'biweekly'):
-                raise ValueError('frequency must be weekly or biweekly')
+            if frequency not in ('', 'weekly', 'biweekly', 'one-time'):
+                raise ValueError('frequency must be weekly, biweekly, or one-time')
+            if frequency == 'one-time' and not event_date:
+                raise ValueError('a one-time mic requires an event date')
             anchor = parse_date(mapped['recurrence_anchor'])
             if anchor and frequency != 'biweekly':
                 raise ValueError('a recurrence anchor requires biweekly frequency')
@@ -408,5 +410,7 @@ def extract(content: bytes, config: SourceConfig, content_type='', filename=''):
             raise ValueError('No supported event data found. Use a CSV/XLSX link, a page with event JSON-LD or a table, or configure HTML card selectors. JavaScript-only pages need a custom adapter; no data was invented.')
     normal_config = config.model_copy(update={'mapping': {}}) if kind in ('cards', 'jsonld') else config
     rows, warnings, skipped = normalize_rows(raw, normal_config)
+    if kind == 'official_club' and skipped:
+        raise ValueError('Official club schedule has ambiguous rows; review required. No partial schedule imported.')
     return {'rows': rows, 'warnings': warnings, 'skipped': skipped, 'raw_count': len(raw),
             'detected_kind': kind, 'sheets': sheets, 'headers': list(raw[0]) if raw else []}

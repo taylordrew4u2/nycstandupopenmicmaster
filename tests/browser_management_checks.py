@@ -43,6 +43,15 @@ def run():
                     assert page.locator('#view-sources').evaluate('(e)=>e.scrollHeight<=e.clientHeight+1'),(width,height,tab)
                     box=page.get_by_role('button',name='Submit for review').bounding_box()
                     assert box['y']+box['height']<=height,(width,height,tab,box)
+            for width,height in [(320,568),(844,390)]:
+                page.set_viewport_size({'width':width,'height':height})
+                page.get_by_role('button',name='When',exact=True).click()
+                for schedule in ['weekly','biweekly','one-time']:
+                    page.get_by_label('Schedule',exact=True).select_option(schedule)
+                    assert page.get_by_label('Confirmed biweekly date',exact=True).is_visible()==(schedule=='biweekly')
+                    assert page.get_by_label('One-time date (optional)',exact=True).is_visible()==(schedule=='one-time')
+                    assert page.locator('#view-sources').evaluate('(e)=>e.scrollHeight<=e.clientHeight+1'),(width,height,schedule)
+                page.get_by_label('Schedule',exact=True).select_option('weekly')
             page.set_viewport_size({'width':390,'height':844})
             page.get_by_role('button',name='Mic',exact=True).click()
             page.get_by_label('Mic name',exact=True).fill('Submitted Browser Mic')
@@ -68,8 +77,8 @@ def run():
             assert page.locator('.visitor-counts strong').all_text_contents()==['1','1','1','1']
             page.locator('[data-admin-tab="proposals"]').click()
             page.on('dialog',lambda d:d.accept('Verified with the venue.') if d.type=='prompt' else d.accept())
-            page.get_by_role('button',name='Approve mic & host setup').click()
-            expect(page.locator('#modal')).to_be_visible()
+            page.get_by_role('button',name='Approve',exact=True).click()
+            page.wait_for_selector('#toast')
             page.goto(status_url)
             page.get_by_role('link',name='Set up host password').click()
             host_password=secrets.token_urlsafe(24)

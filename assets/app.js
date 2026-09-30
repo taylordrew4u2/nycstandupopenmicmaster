@@ -101,7 +101,14 @@ function biweeklyThisWeek(r){
   return null;
 }
 function recurrenceFields(r){
-  return '<div class="form-row">'+selectField('Repeats','frequency',[['','Use source / unspecified'],['weekly','Every week'],['biweekly','Every other week']],r.frequency||'')+field('Confirmed biweekly date (optional)','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
+  return '<div class="form-row">'+selectField('Schedule','frequency',[['weekly','Weekly'],['biweekly','Biweekly (every other week)'],['one-time','One-time']],r.frequency||(r.date?'one-time':isBiweekly(r)?'biweekly':'weekly'))+field('Confirmed biweekly date','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
+}
+function syncScheduleForm(form,changed=false){
+  if(!form)return;const frequency=$('[name=frequency]',form)?.value;if(!frequency)return;
+  const date=$('[name=date]',form),day=$('[name=weekday]',form),anchor=$('[name=recurrence_anchor]',form);
+  if(date){date.closest('.field').hidden=frequency!=='one-time';date.required=frequency==='one-time';if(changed&&frequency!=='one-time')date.value='';}
+  if(day)day.closest('.field').hidden=frequency==='one-time';
+  if(anchor){anchor.closest('.field').hidden=frequency!=='biweekly';anchor.required=form.id==='mic-proposal-form'&&frequency==='biweekly';if(changed&&frequency!=='biweekly')anchor.value='';}
 }
 function filtered(){return state.data.listings.filter(r=>{
   if(state.hideOffWeek&&isBiweekly(r)&&biweeklyThisWeek(r)===false)return false;
@@ -183,7 +190,7 @@ function submission(id,kind){
   const r=findMic(id);if(!r)return;
   if(kind==='claim'&&r.claimed){modal('This mic has a host.',`<p>The host can sign in to edit this listing. For ownership disputes or corrections, submit a fix for the administrator.</p><a class="button primary" href="/owner">Host login</a>`,button('Submit a fix','submit-fix',id));return;}
   const report=kind==='report',claim=kind==='claim';
-  modal(claim?'Claim this mic':report?'Report an inactive mic':'Submit a correction',`<p>${esc(r.name)} · ${esc(r.venue)}</p><form id="submission-form" data-id="${esc(id)}" data-kind="${kind}">${field(report?'Your name (optional)':'Your name','name','','text',!report)}${field(claim?'Email for your host account':'Email (optional, for follow-up)','email','','email',claim)}${textField(claim?'How can we verify you run this mic?':report?'Why does this mic no longer run? Add a source or the last date it ran.':'What needs fixing? Include the correct details and a source link.','message','',true)}<div class="honeypot" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div><p class="form-helper">${claim?'The administrator verifies claims and shares a one-use setup link after approval.':report?'The administrator reviews reports before hiding a mic. Your report will not remove it automatically.':'The administrator reviews corrections before updating listings.'} Your contact details are not published.</p><button class="button primary" type="submit">${claim?'Submit claim':report?'Send report':'Send correction'}</button></form>`);
+  modal(claim?'Claim this mic':report?'Report an inactive mic':'Submit a correction',`<p>${esc(r.name)} · ${esc(r.venue)}</p><form id="submission-form" data-id="${esc(id)}" data-kind="${kind}">${field(report?'Your name (optional)':'Your name','name','','text',!report)}${field(claim?'Email for your host account':'Email (optional, for follow-up)','email','','email',claim)}${textField(claim?'How can we verify you run this mic?':report?'Why does this mic no longer run? Add a source or the last date it ran.':'What needs fixing? Include the correct details and a source link.','message','',true)}<div class="honeypot" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div><p class="form-helper">${claim?'You will receive a private status link. Save it and check for approval; password setup appears there when approved.':report?'The administrator reviews reports before hiding a mic. Your report will not remove it automatically.':'The administrator reviews corrections before updating listings.'} Your contact details are not published.</p><button class="button primary" type="submit">${claim?'Submit claim':report?'Send report':'Send correction'}</button></form>`);
 }
 function sourceForm(){state.preview=null;modal('Add your source.',`<p>Paste a public source URL or upload a spreadsheet. Preview the extracted rows before anything is published.</p><form id="source-form">${field('Source name','name','','text',true)}${selectField('Source type','kind',[['auto','Website / automatic detection'],['csv','Online CSV / published Google Sheet'],['xlsx','Online Excel (.xlsx)'],['json','JSON events feed'],['table','Website table'],['jsonld','Structured event page (JSON-LD)'],['cards','Website cards (configure selectors)'],['upload','Upload Excel or CSV']],'auto')}<div id="source-url-field">${field('Public URL','url','','url',false,'For Google Sheets, use its published CSV export URL. Private/login-only pages are not supported.')}</div><div id="source-file-field" hidden><div class="field"><label for="source-file">Excel or CSV file (maximum 5 MB)</label><input type="file" id="source-file" name="file" accept=".csv,.xlsx"><p class="form-helper">An upload is a snapshot. Use an online file URL for scheduled updates.</p></div></div><div class="form-row">${selectField('Check for updates','interval_minutes',[[15,'Every 15 minutes'],[30,'Every 30 minutes'],[60,'Every hour'],[180,'Every 3 hours'],[360,'Every 6 hours'],[720,'Every 12 hours'],[1440,'Daily']],60)}${selectField('Source priority','priority',[[100,'High — official host / venue'],[50,'Normal — directory'],[10,'Low — secondary source']],50)}</div><details><summary>Field mapping and source-specific settings</summary>${field('Worksheet (optional)','sheet')}${field('Table or repeating card CSS selector (optional)','row_selector','','text',false,'For cards, enter a repeating container such as .event. Field mappings below then become CSS selectors inside that card.')}${textField('Column mapping (JSON, optional)','mapping','{}')}${textField('Default fields (JSON, optional)','defaults','{}')}<p class="form-helper">Mapping example: {"name":"Event title","venue":"Place","weekday":"Day"}. Defaults example: {"borough":"Queens"}. Only set a borough default when it is true for every row. Pin fields: latitude and longitude.</p></details><label class="checkbox-label"><input type="checkbox" name="permission_confirmed" required> I have permission to access and reuse this source. Its source URL will be visible on listings.</label><button type="submit" class="button primary">Preview import ↗</button></form>`);}
 function previewTable(result){return `<div class="preview-summary"><span class="tag">${result.rows.length} valid listings</span><span class="tag ${result.skipped?'stale-badge':''}">${result.skipped} skipped rows</span><span class="tag">${esc(result.detected_kind)}</span></div><div class="preview-table-wrapper"><table class="preview-table"><thead><tr><th>Mic</th><th>Venue</th><th>Day / date</th><th>Time</th><th>Borough</th></tr></thead><tbody>${result.rows.slice(0,100).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.venue)}</td><td>${esc(r.date||DAYS[r.weekday])}</td><td>${esc(timeText(r.start_time))}</td><td>${esc(r.borough)}</td></tr>`).join('')}</tbody></table></div>${result.rows.length>100?'<p class="form-helper">Showing the first 100 rows.</p>':''}<div class="warning-list">${result.warnings.map(w=>`<p>${esc(w)}</p>`).join('')}</div>${result.skipped?'<p class="security-warning">Skipped rows will not be published. Future automatic checks with skipped rows will be held for review.</p>':''}`;}
@@ -224,10 +231,10 @@ async function renderAdminBody(){const root=$('#admin-body'),a=state.admin,c=sta
     if(candidates.length)root.insertAdjacentHTML('beforeend',`<details class="club-review"><summary>Club sources to review (${candidates.length})</summary><p class="notice-inline">These are research leads, not syncing sources. No listings are added until a schedule is verified.</p>${candidates.map(s=>`<article class="queue-item"><h3>${external(s.url,s.name)}</h3><p>${esc(s.note)}</p><small>Reviewed ${esc(s.reviewed_at)}</small></article>`).join('')}</details>`);
   }else if(['claims','fixes','reports'].includes(state.adminTab)){
     const kind=state.adminTab==='claims'?'claim':state.adminTab==='reports'?'report':'fix';const rows=c.submissions.filter(s=>s.kind===kind);
-    root.innerHTML=`<p class="notice-inline">${kind==='claim'?'Verify the person actually runs the mic before approving. Approval generates a one-use link for you to send directly. Nothing is automatically emailed.':kind==='report'?'Verify whether the mic no longer runs. Reports alone do not hide a listing; you can hide a confirmed inactive mic below.':'Corrections do not edit the public directory automatically. Open the mic, apply the correction, then mark the submission resolved.'}</p>${rows.length?rows.map(s=>`<article class="queue-item"><div class="queue-heading"><div><h3>${esc(s.mic_name)}</h3><small>${esc(s.name)}${s.email?' · '+esc(s.email):''} · ${ago(s.created)}</small></div><span class="tag ${s.state==='pending'?'stale-badge':''}">${esc(s.state)}</span></div><p>${esc(s.message)}</p>${s.note?`<p>Review note: ${esc(s.note)}</p>`:''}<div class="queue-buttons">${button('View / edit mic','edit-admin',s.mic_id)}${['pending','approved'].includes(s.state)?kind==='claim'?button(s.state==='approved'?'Create replacement signup link':'Approve & create signup link','claim-approve',s.id,'primary')+button('Reject','submission-reject',s.id):kind==='report'?button('Hide mic & resolve','report-hide',s.id,'primary')+button('Dismiss','submission-reject',s.id):button('Mark resolved','fix-resolve',s.id,'primary')+button('Reject','submission-reject',s.id):''}</div></article>`).join(''):blank('Nothing awaiting your judgment.','New '+(kind==='claim'?'ownership claims':kind==='report'?'inactive mic reports':'corrections')+' will appear here.')}`;
+    root.innerHTML=`<p class="notice-inline">${kind==='claim'?'Verify the person actually runs the mic before approving. Approval unlocks password setup on the host’s saved status link. No message needs to be sent.':kind==='report'?'Verify whether the mic no longer runs. Reports alone do not hide a listing; you can hide a confirmed inactive mic below.':'Corrections do not edit the public directory automatically. Open the mic, apply the correction, then mark the submission resolved.'}</p>${rows.length?rows.map(s=>`<article class="queue-item"><div class="queue-heading"><div><h3>${esc(s.mic_name)}</h3><small>${esc(s.name)}${s.email?' · '+esc(s.email):''} · ${ago(s.created)}</small></div><span class="tag ${s.state==='pending'?'stale-badge':''}">${esc(s.state)}</span></div><p>${esc(s.message)}</p>${s.note?`<p>Review note: ${esc(s.note)}</p>`:''}<div class="queue-buttons">${button('View / edit mic','edit-admin',s.mic_id)}${['pending','approved'].includes(s.state)?kind==='claim'?button(s.state==='approved'?'Create replacement signup link':'Approve','claim-approve',s.id,'primary')+button('Reject','submission-reject',s.id):kind==='report'?button('Hide mic & resolve','report-hide',s.id,'primary')+button('Dismiss','submission-reject',s.id):button('Mark resolved','fix-resolve',s.id,'primary')+button('Reject','submission-reject',s.id):''}</div></article>`).join(''):blank('Nothing awaiting your judgment.','New '+(kind==='claim'?'ownership claims':kind==='report'?'inactive mic reports':'corrections')+' will appear here.')}`;
   }else if(state.adminTab==='proposals'){
     const rows=(c.proposals||[]).slice().sort((a,b)=>Number(b.state==='pending')-Number(a.state==='pending')||b.created-a.created);
-    root.innerHTML=`<p class="notice-inline">Verify the mic details and that the submitter runs it. Approval publishes the mic and unlocks password setup on their private status page. Nothing is automatically emailed.</p>${rows.length?rows.map(p=>`<article class="queue-item"><div class="queue-heading"><div><h3>${esc(p.listing.name)}</h3><small>${esc(p.listing.venue)} · ${esc(p.listing.borough)} · ${esc(p.listing.date||DAYS[p.listing.weekday])} ${esc(timeText(p.listing.start_time))}</small></div><span class="tag">${esc(p.state)}</span></div><p>${esc(p.listing.address)}<br>Fee: ${esc(p.listing.cost_text||'Not provided')}</p><p><strong>${esc(p.name)}</strong> · ${esc(p.email)}</p><p>${esc(p.message)}</p>${p.reply?`<p>Reply to submitter: ${esc(p.reply)}</p>`:''}<div class="queue-buttons">${p.state==='pending'?button('Approve mic & host setup','proposal-approve',p.id,'primary')+button('Reject','proposal-reject',p.id):p.mic_id?button('View / edit mic','edit-admin',p.mic_id):''}</div></article>`).join(''):blank('No new mic submissions.','Submissions from the menu appear here for your review.')}`;
+    root.innerHTML=`<p class="notice-inline">Verify the mic details and that the submitter runs it. Approval publishes the mic and unlocks password setup on their private status page. Nothing is automatically emailed.</p>${rows.length?rows.map(p=>`<article class="queue-item"><div class="queue-heading"><div><h3>${esc(p.listing.name)}</h3><small>${esc(p.listing.venue)} · ${esc(p.listing.borough)} · ${esc(p.listing.date||DAYS[p.listing.weekday])} ${esc(timeText(p.listing.start_time))}</small></div><span class="tag">${esc(p.state)}</span></div><p>${esc(p.listing.address)}<br>Fee: ${esc(p.listing.cost_text||'Not provided')}</p><p><strong>${esc(p.name)}</strong> · ${esc(p.email)}</p><p>${esc(p.message)}</p>${p.reply?`<p>Reply to submitter: ${esc(p.reply)}</p>`:''}<div class="queue-buttons">${p.state==='pending'?button('Approve','proposal-approve',p.id,'primary')+button('Reject','proposal-reject',p.id):p.mic_id?button('View / edit mic','edit-admin',p.mic_id):''}</div></article>`).join(''):blank('No new mic submissions.','Submissions from the menu appear here for your review.')}`;
   }else if(state.adminTab==='owners'){
     root.innerHTML=c.ownership.length?c.ownership.map(o=>`<article class="queue-item"><h3>${esc(findMic(o.mic_id)?.name||o.mic_id)}</h3><p>${esc(o.name)} · ${esc(o.email)}</p><small>Approved ${ago(o.approved)}</small><div class="queue-buttons">${button('Edit mic','edit-admin',o.mic_id)}${button('Revoke host access','owner-revoke',o.mic_id)}</div></article>`).join(''):blank('No approved hosts yet.','Approve a claim and share its signup link. The host appears here after creating an account.');
   }else if(state.adminTab==='mics'){
@@ -239,7 +246,7 @@ async function renderAdminBody(){const root=$('#admin-body'),a=state.admin,c=sta
 function renderAdminMics(q){const rows=state.community.listings.filter(r=>`${r.name} ${r.venue} ${r.borough}`.toLowerCase().includes(q));$('#admin-mic-rows').innerHTML=rows.length?rows.map(r=>`<article class="queue-item"><div class="queue-heading"><div><h3>${esc(r.name)}</h3><small>${esc(r.venue)} · ${esc(r.borough)} · ${esc(r.date||DAYS[r.weekday])} ${esc(timeText(r.start_time))}</small></div><span class="tag">${r.hidden?'Hidden':'Published'}</span></div><p>${r.claimed?'Host claimed · ':''}${r.curated?'Edited values protected from scraping · ':''}${!Number.isFinite(r.latitude)?'Location needs a map pin':'Location mapped'}</p><div class="queue-buttons">${button('Edit mic / pin','edit-admin',r.id,'primary')}${button(r.hidden?'Publish':'Hide from directory','mic-hide',r.id)}${r.curated?button('Restore source values','mic-restore',r.id):''}</div></article>`).join(''):blank('No listings yet.','Import a source or add a mic manually.');}
 function editForm(id,mode){const r=id?findMic(id):{};if(id&&!r){toast('This mic is no longer available.');return;}
   modal(id?'Edit the mic.':'Add a mic.',`<p>${mode==='owner'?'You can edit only mics approved for your account. Your edits take priority over imports.':'Changes are saved over the source data. Unchanged fields continue syncing.'}</p><form id="edit-form" data-id="${esc(id||'')}" data-mode="${mode}"><div class="form-row">${field('Mic name','name',r.name||'','text',true)}${field('Venue','venue',r.venue||'','text',true)}</div>${field('Street address','address',r.address||'','text',true)}<div class="form-row">${selectField('Borough','borough',BOROUGHS,r.borough||'Manhattan')}${field('Neighborhood (optional)','neighborhood',r.neighborhood||'')}</div><div class="form-row">${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),r.weekday??0)}${field('One-time date (overrides weekly day)','date',r.date||'','date')}</div><div class="form-row">${field('Start time','start_time',r.start_time||'19:00','time',true)}${field('Signup time (optional)','signup_time',r.signup_time||'','time')}</div><div class="form-row">${field('Entry fee (Free, $5, or descriptive)','cost',r.cost_text||'')}${field('Purchase minimum (optional)','purchase_minimum',r.purchase_minimum||'')}</div><div class="form-row">${field('Minutes per comic','set_minutes',r.set_minutes||'','number')}${field('Signup method','signup_method',r.signup_method||'')}</div>${field('Host name(s), public','host_names',r.host_names||'')}${textField('Host social links (optional, up to 5 URLs)','host_socials',r.host_socials||'')}${field('Signup link','signup_url',r.signup_url||'','url')}${selectField('Status','status',['scheduled','cancelled','postponed'],r.status||'scheduled')}${recurrenceFields(r)}${field('Excluded dates, comma-separated YYYY-MM-DD','excluded_dates',(r.excluded_dates||[]).join(', '))}${textField('Notes','notes',r.notes||'')}<details><summary>Map pin coordinates</summary><p class="form-helper">Use accurate coordinates for this venue. Leave both blank to request address geocoding. Approximate geocoder matches are labeled on the directory.</p><div class="form-row">${field('Latitude','latitude',r.latitude??'','number')}${field('Longitude','longitude',r.longitude??'','number')}</div></details><button type="submit" class="button primary">Save mic ↗</button></form>`);
-  $('#edit-form').dataset.original=JSON.stringify(Object.fromEntries(new FormData($('#edit-form'))));
+  syncScheduleForm($('#edit-form'));$('#edit-form').dataset.original=JSON.stringify(Object.fromEntries(new FormData($('#edit-form'))));
 }
 function submissionTab(tab){
   $$('[data-submission-panel]').forEach(p=>p.hidden=p.dataset.submissionPanel!==tab);
@@ -255,9 +262,9 @@ async function renderSubmit(){
         ${field('Mic name','mic_name','','text',true)}${field('Venue','venue','','text',true)}${field('Street address','address','','text',true)}${selectField('Borough','borough',BOROUGHS,'Manhattan')}
       </div>
       <div class="host-edit-panel" data-submission-panel="when" hidden>
-        <div class="form-row">${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),0)}${field('One-time date (optional)','date','','date')}</div>
+        ${recurrenceFields({})}<div class="form-row">${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),0)}${field('One-time date (optional)','date','','date')}</div>
         ${field('Start time','start_time','','time',true)}${field('Entry fee (optional)','cost')}
-        <p class="host-help">Choose a weekly day, or enter a date for a one-time mic.</p>
+        <p class="host-help">Choose a schedule. For biweekly mics, enter a confirmed date so we know which weeks they run.</p>
       </div>
       <div class="host-edit-panel" data-submission-panel="you" hidden>
         ${field('Your name','name','','text',true)}${field('Your host email','email','','email',true)}${textField('How can we verify you run this mic? Include a venue or social link.','message','',true)}
@@ -266,13 +273,13 @@ async function renderSubmit(){
       </div>
       <div class="host-save-row"><span>Nothing is published until approved.</span><button type="submit" class="button primary">Submit for review</button></div>
     </form>`;
-  submissionTab('mic');
+  syncScheduleForm($('#mic-proposal-form'));submissionTab('mic');
 }
 async function renderProposalStatus(){
   const root=$('#view-sources'),token=location.hash.slice(1);if(!token)return;
   try{
-    const result=await api('/api/mic-proposals/status',{method:'POST',body:{token}});state.proposalState=result.state;
-    const states={pending:['Submitted for review','Save this private link. This page checks for the decision while open.'],approved:['Your mic is approved',result.can_setup?'Your mic is published. Set up your host password to claim and edit it.':'Your mic is published. The setup link expired or was replaced; ask the administrator for a new link.'],rejected:['Submission not approved','The administrator has reviewed your submission.'],activated:['Your host access is ready','Sign in to update your mic whenever you need.'],revoked:['Host access is unavailable','Contact the administrator about this submission.']};
+    const result=await api(location.pathname==='/claim-status'?'/api/claims/status':'/api/mic-proposals/status',{method:'POST',body:{token}});state.proposalState=result.state;
+    const states={pending:['Submitted for review','Save this link—don’t lose it. Keep checking here for approval. This page checks automatically while open.'],approved:['Your mic is approved',result.can_setup?'Your mic is published. Set up your host password to claim and edit it.':'Your mic is published. The setup link expired or was replaced; ask the administrator for a new link.'],rejected:['Submission not approved','The administrator has reviewed your submission.'],activated:['Your host access is ready','Sign in to update your mic whenever you need.'],revoked:['Host access is unavailable','Contact the administrator about this submission.']};
     const [title,message]=states[result.state]||['Submission status','Check with the administrator.'];
     root.innerHTML=`<div class="host-heading"><h1>${esc(title)}</h1><a class="text-link" href="/">Back to map</a></div><div class="proposal-status"><h2>${esc(result.mic_name)}</h2><p role="status">${esc(message)}</p>${result.reply?`<p class="proposal-reply">${esc(result.reply)}</p>`:''}${result.can_setup?`<a class="button primary" href="/claim#${esc(token)}">Set up host password</a><p class="host-help">Setup access expires ${esc(new Date(result.expires_at*1000).toLocaleDateString('en-US',{timeZone:'America/New_York'}))}.</p>`:''}${result.state==='activated'?'<a class="button primary" href="/owner">Host sign in</a>':''}<label for="proposal-status-link">Your private status link</label><input id="proposal-status-link" readonly value="${esc(location.href)}"><div class="queue-buttons">${button('Copy status link','copy-proposal-link')}${button('Check status','proposal-refresh')}</div><p class="host-help">Keep this link private: after approval it grants access to your mic. No email has been sent.</p></div>`;
   }catch(err){state.proposalState=null;root.innerHTML=blank('Status could not load.',esc(err.message),button('Try again','proposal-refresh'));}
@@ -298,7 +305,7 @@ function renderHostEditor(){
       ${textField('Notes','notes',r.notes||'')}
     </div>
     <div class="host-edit-panel" data-host-panel="when" hidden>
-      <div class="form-row">${field('Date (blank for weekly)','date',r.date||'','date')}${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),r.weekday??0)}</div>
+      <div class="form-row">${field('One-time date','date',r.date||'','date')}${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),r.weekday??0)}</div>
       ${recurrenceFields(r)}<div class="form-row">${field('Start time','start_time',r.start_time||'19:00','time',true)}${field('Signup time (optional)','signup_time',r.signup_time||'','time')}</div>
       ${selectField('Status for this listing','status',[['scheduled','Scheduled'],['cancelled','Cancelled'],['postponed','Postponed']],r.status||'scheduled')}
       ${field('Skip dates (YYYY-MM-DD, comma separated)','excluded_dates',(r.excluded_dates||[]).join(', '))}
@@ -318,7 +325,7 @@ function renderHostEditor(){
     </div>
     <div class="host-save-row"><span id="host-save-state" role="status">Your edits are protected from imports.</span><button type="submit" class="button primary">Save changes</button></div>
   </form>`;
-  const f=$('#host-edit-form');f.dataset.original=JSON.stringify(Object.fromEntries(new FormData(f)));hostTab(state.ownerTab||'mic');
+  const f=$('#host-edit-form');syncScheduleForm(f);f.dataset.original=JSON.stringify(Object.fromEntries(new FormData(f)));hostTab(state.ownerTab||'mic');
 }
 async function renderOwner(){
   $('#view-directory').hidden=true;$('#view-sources').hidden=false;const root=$('#view-sources');root.classList.add('host-page');document.title='Host dashboard | NYC Open Mic Master List';
@@ -333,7 +340,7 @@ async function renderOwner(){
   }catch(err){
     state.owner=null;
     if(err.status!==401&&!window.MICLIST_PREVIEW){root.innerHTML=blank('Host sign-in unavailable.',esc(err.message),button('Try again','owner-refresh'));return;}
-    root.innerHTML=`<div class="login-panel"><h1>Host sign in</h1><p>Use the account created from your approved claim.</p><form id="owner-login">${field('Email','email','','email',true)}${field('Password','password','','password',true)}<button class="button primary" type="submit">Sign in</button></form><p class="community-link">First time? Open the setup link shared after your claim was approved.</p><a href="/" class="text-link">Find and claim your mic</a></div>`;
+    root.innerHTML=`<div class="login-panel"><h1>Host sign in</h1><p>Use the account created from your approved claim.</p><form id="owner-login">${field('Email','email','','email',true)}${field('Password','password','','password',true)}<button class="button primary" type="submit">Sign in</button></form><p class="community-link">First time? Check your saved private status link. Password setup appears there after approval.</p><a href="/" class="text-link">Find and claim your mic</a></div>`;
   }
 }
 async function renderClaim(){
@@ -349,7 +356,7 @@ document.addEventListener('submit',async e=>{
   try{const raw=Object.fromEntries(new FormData(f));
     if(f.id==='about-form'){await api('/api/admin/about',{method:'PUT',body:raw});f.dataset.original=JSON.stringify(raw);toast('About page updated.');}
     if(f.id==='mic-proposal-form'){
-      const fields={name:raw.mic_name};for(const key of ['venue','address','borough','weekday','date','start_time','cost'])fields[key]=raw[key];
+      const fields={name:raw.mic_name};for(const key of ['venue','address','borough','weekday','date','start_time','cost','frequency','recurrence_anchor'])fields[key]=raw[key];
       const result=await api('/api/mic-proposals',{method:'POST',body:{name:raw.name,email:raw.email,message:raw.message,website:raw.website,fields}});
       f.reset();history.replaceState(null,'',result.status_path);await renderSubmit();
     }
@@ -361,7 +368,7 @@ document.addEventListener('submit',async e=>{
     if(f.id==='host-edit-form'){
       const original=JSON.parse(f.dataset.original),fields={};for(const [key,value]of Object.entries(raw))if(value!==original[key])fields[key]=value;
       if(!Object.keys(fields).length){toast('No changes to save.');return;}
-      if('date' in fields||'weekday' in fields){fields.date=raw.date;fields.weekday=raw.weekday;}
+      if('date' in fields||'weekday' in fields||'frequency' in fields){fields.date=raw.date;fields.weekday=raw.weekday;if('frequency' in fields)fields.recurrence_anchor=raw.recurrence_anchor||'';}
       if('address' in fields||'borough' in fields){if(!('latitude' in fields))fields.latitude='';if(!('longitude' in fields))fields.longitude='';}
       await api(`/api/owner/mics/${f.dataset.id}`,{method:'PATCH',body:{fields}});
       await renderOwner();toast('Changes saved.');
@@ -370,7 +377,7 @@ document.addEventListener('submit',async e=>{
     if(f.id==='admin-login'){await api('/api/login',{method:'POST',body:{password:raw.password}});await renderAdmin();}
     if(f.id==='owner-login'){await api('/api/owner/login',{method:'POST',body:raw});await renderOwner();}
     if(f.id==='redeem-form'){if(f.dataset.newAccount==='true'&&raw.password!==raw.confirm_password)throw Error('Passwords do not match.');await api('/api/owner/redeem',{method:'POST',body:{token:f.dataset.token,password:raw.password}});history.replaceState(null,'','/owner');await renderOwner();}
-    if(f.id==='submission-form'){if(f.dataset.kind==='report'&&!raw.name.trim())raw.name='Anonymous';const result=await api(`/api/mics/${f.dataset.id}/submissions`,{method:'POST',body:{kind:f.dataset.kind,...raw}});$('#modal').close();toast(result.message);}
+    if(f.id==='submission-form'){if(f.dataset.kind==='report'&&!raw.name.trim())raw.name='Anonymous';const result=await api(`/api/mics/${f.dataset.id}/submissions`,{method:'POST',body:{kind:f.dataset.kind,...raw}});$('#modal').close();if(result.status_path){history.replaceState(null,'',result.status_path);await renderSubmit();}else toast(result.message);}
     if(f.id==='source-form'){
       const config={name:raw.name,url:raw.kind==='upload'?'':raw.url,kind:raw.kind,interval_minutes:Number(raw.interval_minutes),priority:Number(raw.priority),permission_confirmed:raw.permission_confirmed==='on',sheet:raw.sheet,row_selector:raw.row_selector,mapping:JSON.parse(raw.mapping||'{}'),defaults:JSON.parse(raw.defaults||'{}')};let result;
       if(config.kind==='upload'){const file=$('#source-file').files[0];if(!file)throw Error('Choose an Excel or CSV file.');const body=new FormData();body.append('file',file);body.append('config',JSON.stringify(config));result=await api('/api/sources/upload-preview',{method:'POST',body});}
@@ -380,7 +387,7 @@ document.addEventListener('submit',async e=>{
     if(f.id==='edit-form'){
       const original=JSON.parse(f.dataset.original||'{}'),fields={};for(const [k,v]of Object.entries(raw))if(!f.dataset.id||v!==original[k])fields[k]=v;
       if(!Object.keys(fields).length){$('#modal').close();toast('No changes to save.');return;}
-      if('date' in fields||'weekday' in fields){fields.date=raw.date;fields.weekday=raw.weekday;}
+      if('date' in fields||'weekday' in fields||'frequency' in fields){fields.date=raw.date;fields.weekday=raw.weekday;if('frequency' in fields)fields.recurrence_anchor=raw.recurrence_anchor||'';}
       if('address' in fields||'borough' in fields){if(!('latitude' in fields))fields.latitude='';if(!('longitude' in fields))fields.longitude='';}
       const id=f.dataset.id,mode=f.dataset.mode;const path=id?`/api/${mode==='owner'?'owner':'admin'}/mics/${id}`:'/api/admin/mics';
       await api(path,{method:id?'PATCH':'POST',body:{fields}});$('#modal').close();toast('Mic saved.');await loadPublic();if(mode==='owner')await renderOwner();else await renderAdmin();
@@ -449,22 +456,22 @@ document.addEventListener('click',async e=>{
     if(action==='mic-restore'){if(!confirm('Remove manual/host overrides and use the imported source values again?'))return;await api(`/api/admin/mics/${id}/restore`,{method:'POST'});await loadPublic();await renderAdmin();}
     if(action==='owner-revoke'){if(!confirm('Revoke this host’s editing access to this mic? Existing edits remain until you change or restore them.'))return;await api(`/api/admin/mics/${id}/owner`,{method:'DELETE'});await loadPublic();await renderAdmin();}
     if(['proposal-approve','proposal-reject'].includes(action)){
-      const approve=action==='proposal-approve';if(approve&&!confirm('Have you verified the mic details and that this person runs it? Approval publishes the mic and grants password setup.'))return;
-      const reply=prompt('Optional message shown to the submitter:','');if(reply===null)return;
+      const approve=action==='proposal-approve';
+      const reply='';
       const result=await api(`/api/admin/mic-proposals/${id}`,{method:'POST',body:{action:approve?'approve':'reject',reply}});await renderAdmin();
-      if(result.invite_path){const link=location.origin+result.invite_path;modal('Mic approved',`<p>${esc(result.message)}</p><p>You can also send this one-use setup link to ${esc(result.email)}:</p><div class="invite-link">${esc(link)}</div>`,button('Copy setup link','copy-invite',link,'primary'));}else toast(result.message);
+      toast(result.message);
     }
     if(['claim-approve','submission-reject','fix-resolve','report-hide'].includes(action)){
       if(action==='report-hide'&&!confirm('Hide this mic from the public map and list? It can be restored in All mics.'))return;
-      if(action==='claim-approve'&&!confirm('Have you verified that this person runs the mic? Approving creates an account setup link for their email.'))return;
-      const note=prompt('Optional private review note:','');if(note===null)return;
+      const note='';
       const result=await api(`/api/admin/submissions/${id}`,{method:'POST',body:{action:action==='claim-approve'?'approve':action==='fix-resolve'?'resolve':action==='report-hide'?'hide':'reject',note}});await renderAdmin();
-      if(result.invite_path){const link=location.origin+result.invite_path;modal('Claim approved.',`<p>Send this signup link directly to <strong>${esc(result.email)}</strong> after verifying their identity.</p><div class="invite-link">${esc(link)}</div><p class="security-warning">This link grants access to the approved mic. It expires in seven days and works once. It has <strong>not</strong> been emailed.</p>`,button('Copy signup link','copy-invite',link,'primary'));}else toast('Review saved.');
+      if(result.status_link_ready){toast(result.message);}else if(result.invite_path){const link=location.origin+result.invite_path;modal('Claim approved.',`<p>Send this signup link directly to <strong>${esc(result.email)}</strong> after verifying their identity.</p><div class="invite-link">${esc(link)}</div><p class="security-warning">This link grants access to the approved mic. It expires in seven days and works once. It has <strong>not</strong> been emailed.</p>`,button('Copy signup link','copy-invite',link,'primary'));}else toast('Review saved.');
     }
     if(action==='copy-invite'){await navigator.clipboard.writeText(id);toast('Signup link copied.');}
   }catch(err){toast(err.message);el.disabled=false;}
 });
 document.addEventListener('change',async e=>{const t=e.target;try{
+  if(t.name==='frequency'){syncScheduleForm(t.form,true);if(t.form?.id==='host-edit-form')$('#host-save-state').textContent='Unsaved changes';}
   if(t.id==='host-mic-select'){if(hostDirty()&&!confirm('Discard unsaved changes and switch listings?')){t.value=state.ownerMic;return;}state.ownerMic=t.value;renderHostEditor();}
   if(t.id==='day-filter'){state.day=t.value==='all'?'all':Number(t.value);renderDirectory();}
   if(t.id==='borough-filter'){state.borough=t.value;renderDirectory();}
@@ -489,7 +496,7 @@ async function boot(){
   if(location.pathname==='/admin'||location.hash==='#sources'){await renderAdmin();}
   else if(location.pathname==='/owner'){await renderOwner();}
   else if(location.pathname==='/claim'){await renderClaim();}
-  else if(location.pathname==='/submit'){await renderSubmit();}
+  else if(['/submit','/claim-status'].includes(location.pathname)){await renderSubmit();}
   else{await loadPublic();const id=new URLSearchParams(location.search).get('mic');if(id){const r=findMic(id);if(r){state.day=r.date?weekday(r.date):r.weekday;renderDirectory();details(id);}else toast('This mic is no longer listed.');}}
 }
 new ResizeObserver(()=>{if(!$('#view-directory').hidden)renderCards();}).observe($('#cards'));
@@ -499,5 +506,5 @@ setInterval(()=>{if(!document.hidden&&!state.demo&&location.pathname==='/')loadP
 
 
 
-setInterval(()=>{if(!document.hidden&&location.pathname==='/submit'&&location.hash&&state.proposalState==='pending')renderProposalStatus();},30000);
+setInterval(()=>{if(!document.hidden&&['/submit','/claim-status'].includes(location.pathname)&&location.hash&&state.proposalState==='pending')renderProposalStatus();},30000);
 setInterval(()=>{if(!document.hidden&&!state.demo&&location.pathname!=='/')loadSyncStatus();},60000);

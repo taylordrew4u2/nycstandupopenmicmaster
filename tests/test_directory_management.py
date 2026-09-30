@@ -184,3 +184,49 @@ def test_custom_domain_search_metadata(clients):
         assert doc.find('meta',property='og:url')['content']=='https://nycopenmicmasterlist.com'+path
     assert 'https://nycopenmicmasterlist.com/sitemap.xml' in visitor.get('/robots.txt').text
     assert 'vercel.app' not in visitor.get('/sitemap.xml').text
+
+
+def test_claim_private_status_unlocks_without_manual_link(clients):
+    app, admin, visitor = clients
+    fields = dict(name='Claimable mic',venue='Room',address='1 Broadway',borough='Manhattan',
+                  weekday='Wednesday',start_time='19:00')
+    added=admin.post('/api/admin/mics',json={'fields':fields})
+    assert added.status_code==201, added.text
+    mic=visitor.get('/api/public').json()['listings'][0]
+    claim=visitor.post('/api/mics/'+mic['id']+'/submissions',json={
+        'kind':'claim','name':'Host Person','email':'claimant@example.com',
+        'message':'I run this open mic. The venue manager can verify me.'})
+    assert claim.status_code==201
+    token=claim.json()['status_path'].split('#')[1]
+    status=lambda:visitor.post('/api/claims/status',json={'token':token}).json()
+    assert status()['state']=='pending' and not status()['can_setup']
+    assert visitor.post('/api/owner/redeem',json={'token':token,'password':secrets.token_urlsafe(24)}).status_code==400
+    queue=admin.get('/api/admin/community').json()['submissions']
+    assert token not in json.dumps(queue)
+    approved=admin.post('/api/admin/submissions/'+queue[0]['id'],json={'action':'approve'})
+    assert approved.status_code==200 and approved.json()['status_link_ready']
+    assert status()['can_setup']
+    assert 'email' not in status()
+    assert visitor.post('/api/owner/redeem',json={'token':token,'password':secrets.token_urlsafe(24)}).status_code==200
+    assert status()['state']=='activated' and not status()['can_setup']
+    admin.delete('/api/admin/mics/'+mic['id']+'/owner')
+    assert status()['state']=='revoked'
+    assert visitor.post('/api/claims/status',json={'token':'x'*40}).status_code==404
+
+
+@pytest.mark.parametrize('frequency,date,anchor',[
+    ('weekly','',''),('biweekly','','2026-09-30'),('one-time','2026-10-07','')
+])
+def test_submission_schedule_choices(clients,frequency,date,anchor):
+    app,admin,visitor=clients
+    r=visitor.post('/api/mic-proposals',json={
+        'name':'Host Person','email':'host@example.com','message':'Venue manager can confirm I host this mic.',
+        'fields':dict(name='Scheduled mic',venue='Room',address='1 Broadway',borough='Manhattan',
+                      weekday='Wednesday',start_time='19:00',frequency=frequency,date=date,recurrence_anchor=anchor)})
+    assert r.status_code==201,r.text
+    item=admin.get('/api/admin/community').json()['proposals'][0]
+    assert item['listing']['frequency']==frequency
+    assert admin.post('/api/admin/mic-proposals/'+item['id'],json={'action':'approve'}).status_code==200
+    row=visitor.get('/api/public').json()['listings'][0]
+    assert row['frequency']==frequency
+    assert row['date']==(date or None)
