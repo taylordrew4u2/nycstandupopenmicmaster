@@ -360,7 +360,7 @@ document.addEventListener('click',async e=>{
   const aboutButton=e.target.closest('[data-about-tab]');if(aboutButton){$$('[data-about-panel]').forEach(p=>p.hidden=p.dataset.aboutPanel!==aboutButton.dataset.aboutTab);$$('[data-about-tab]').forEach(b=>{const active=b===aboutButton;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});return;}
   const submissionButton=e.target.closest('[data-submission-tab]');if(submissionButton){submissionTab(submissionButton.dataset.submissionTab);return;}
   const hostButton=e.target.closest('[data-host-tab]');if(hostButton){hostTab(hostButton.dataset.hostTab);return;}
-  const tab=e.target.closest('[data-admin-tab]');if(tab){if(tab.dataset.adminTab!==state.adminTab&&aboutDirty()&&!confirm('Discard unsaved About page changes?'))return;state.adminTab=tab.dataset.adminTab;$$('[data-admin-tab]').forEach(t=>t.classList.toggle('active',t===tab));renderAdminBody();return;}
+  const tab=e.target.closest('[data-admin-tab]');if(tab){if(tab.dataset.adminTab===state.adminTab)return;if(aboutDirty()&&!confirm('Discard unsaved About page changes?'))return;state.adminTab=tab.dataset.adminTab;$$('[data-admin-tab]').forEach(t=>t.classList.toggle('active',t===tab));renderAdminBody();return;}
   const el=e.target.closest('[data-action]');if(!el)return;const action=el.dataset.action,id=el.dataset.id;e.preventDefault();
   try{
     if(action==='proposal-refresh')await renderProposalStatus();
