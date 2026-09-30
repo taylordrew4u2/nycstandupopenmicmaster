@@ -17,8 +17,8 @@ from app.store import Store
 from app import scheduling
 
 
-def source(store):
-    config = SourceConfig(name='Test feed', url='https://example.org/mics.csv', kind='csv', permission_confirmed=True)
+def source(store, url='https://example.org/mics.csv'):
+    config = SourceConfig(name='Test feed', url=url, kind='csv', permission_confirmed=True)
     content = b'id,name,venue,borough,weekday,start_time\n1,Test mic,Test venue,Queens,Monday,19:00\n'
     return store.commit_preview(store.preview(config.model_dump(), extract(content, config)))
 
@@ -55,11 +55,14 @@ def test_bounded_due_checks_and_job_lease(database, monkeypatch):
     calls = []
     async def sync(source_id):
         calls.append(source_id)
+        return store.success(source_id, [], {}, unchanged=True)
     assert asyncio.run(scheduling.run_due(store, sync))['checked'] == 0
     with store.connect() as c:
         c.execute('UPDATE sources SET next_check=0 WHERE id=?', (sid,))
-    assert asyncio.run(scheduling.run_due(store, sync, budget=0))['checked'] == 0
-    assert asyncio.run(scheduling.run_due(store, sync))['checked'] == 1
+    deferred = asyncio.run(scheduling.run_due(store, sync, budget=0))
+    assert deferred['checked'] == 0 and deferred['due_remaining'] == 1
+    result = asyncio.run(scheduling.run_due(store, sync))
+    assert result['checked'] == 1 and result['unchanged'] == 1 and result['due_remaining'] == 0
     assert calls == [sid]
     with store.connect() as c:
         c.execute('UPDATE sources SET enabled=0 WHERE id=?', (sid,))
@@ -67,6 +70,62 @@ def test_bounded_due_checks_and_job_lease(database, monkeypatch):
     with store.connect() as c:
         c.execute('INSERT INTO meta VALUES (?,?)', ('sync_lease', f'{time.time()+300}:other'))
     assert asyncio.run(scheduling.run_due(store, sync))['state'] == 'busy'
+
+
+def test_source_failures_are_reported_without_losing_listings(database, monkeypatch):
+    monkeypatch.setenv('GEOCODING_ENABLED', '0')
+    store = Store(database)
+    failed, review = source(store), source(store, 'https://example.org/other-mics.csv')
+    upload = SourceConfig(name='Uploaded archive', kind='upload', permission_confirmed=True)
+    content = b'id,name,venue,borough,weekday,start_time\n2,Archive mic,Test venue,Queens,Tuesday,19:00\n'
+    store.commit_preview(store.preview(upload.model_dump(), extract(content, upload, filename='archive.csv'), content))
+    before = [(r['id'], r['name']) for r in store.public_data()['listings']]
+    with store.connect() as c:
+        c.execute('UPDATE sources SET next_check=0')
+
+    async def sync(source_id):
+        state = 'error' if source_id == failed else 'review'
+        store.failure(source_id, 'A source changed its format.', review=state == 'review')
+        return {'state': state, 'message': 'A source changed its format.'}
+
+    result = asyncio.run(scheduling.run_due(store, sync))
+    assert result['checked'] == 2 and result['failed'] == 1 and result['review'] == 1
+    assert result['enabled_sources'] == 2 and result['snapshot_sources'] == 1
+    assert result['unhealthy_sources'] == 2 and result['due_remaining'] == 0
+    assert {r['source_id'] for r in result['results']} == {failed, review}
+    assert [(r['id'], r['name']) for r in store.public_data()['listings']] == before
+    # Backoff must not make a broken source appear healthy on the next worker run.
+    later = asyncio.run(scheduling.run_due(store, sync))
+    assert later['checked'] == 0 and later['unhealthy_sources'] == 2
+
+
+def test_timed_out_source_is_reported_and_keeps_listings(database, monkeypatch):
+    monkeypatch.setenv('GEOCODING_ENABLED', '0')
+    store = Store(database)
+    sid = source(store)
+    with store.connect() as c:
+        c.execute('UPDATE sources SET next_check=0 WHERE id=?', (sid,))
+
+    async def sync(source_id):
+        raise asyncio.TimeoutError()
+
+    result = asyncio.run(scheduling.run_due(store, sync))
+    assert result['failed'] == 1 and result['unhealthy_sources'] == 1
+    assert result['results'][0]['state'] == 'error'
+    assert len(store.public_data()['listings']) == 1
+
+
+def test_scheduled_report_fails_for_source_issues_but_not_snapshots(capsys):
+    from scripts.scheduled_sync import report_result
+    report_result({'state': 'complete', 'checked': 0, 'snapshot_sources': 1, 'due_remaining': 3})
+    output = capsys.readouterr().out
+    assert 'still due 3' in output and '1 uploaded snapshot(s)' in output
+    for problem in ({'failed': 1}, {'review': 1}, {'unhealthy_sources': 1}):
+        with pytest.raises(SystemExit, match='live sources need attention'):
+            report_result({'state': 'complete', **problem})
+    report_result({'state': 'busy', 'snapshot_sources': 1})
+    with pytest.raises(SystemExit, match='Unexpected'):
+        report_result({'state': 'unknown'})
 
 
 def test_cron_requires_authentication(database, monkeypatch):

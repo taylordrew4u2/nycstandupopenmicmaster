@@ -17,9 +17,15 @@ class SourceConfig(BaseModel):
 
 class PreviewCommit(BaseModel):
     preview_id: str
+    replacement_source_id: str | None = Field(default=None, max_length=100)
 
 class Login(BaseModel):
     password: str = Field(min_length=1, max_length=500)
+
+class AdminPasswordUpdate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    current_password: str = Field(min_length=1, max_length=500, repr=False)
+    new_password: str = Field(min_length=1, max_length=500, repr=False)
 
 class SourceUpdate(BaseModel):
     enabled: bool | None = None

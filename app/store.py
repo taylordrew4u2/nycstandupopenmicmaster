@@ -1,6 +1,7 @@
 """Durable PostgreSQL/SQLite storage, history and conservative deduplication."""
 import hashlib
 import json
+import re
 import sqlite3
 import time
 import threading
@@ -48,6 +49,18 @@ def digest(data):
     if isinstance(data, bytes):
         return hashlib.sha256(data).hexdigest()
     return hashlib.sha256(json.dumps(data, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+def venue_slot(payload):
+    """Exact street/date/time key for matching generic calendar entries only."""
+    address = str(payload.get('address', '')).lower().split(',')[0].strip()
+    for word, short in [('street','st'),('avenue','ave'),('road','rd'),('boulevard','blvd'),
+                        ('west','w'),('east','e'),('north','n'),('south','s')]:
+        address = re.sub(r'\b'+word+r'\b', short, address)
+    address = re.sub(r'(?<=\d)(st|nd|rd|th)\b', '', address)
+    address = re.sub(r'[^a-z0-9]', '', address)
+    if not address or not payload.get('date'):
+        return None
+    return address, key(payload.get('borough','')), payload['date'], payload['start_time']
 
 class Store:
     def __init__(self, path):
@@ -132,7 +145,7 @@ class Store:
                       (preview_id, time.time(), json.dumps(config), json.dumps(result), content, json.dumps(validators or {})))
         return preview_id
 
-    def commit_preview(self, preview_id):
+    def commit_preview(self, preview_id, replacement_source_id=None):
         now = time.time()
         with self.connect() as c:
             c.execute('BEGIN IMMEDIATE')
@@ -142,22 +155,35 @@ class Store:
             config, result = json.loads(row['config']), json.loads(row['result'])
             if not result['rows']:
                 raise ValueError('No valid rows to import.')
+            replacement = c.execute('SELECT * FROM sources WHERE id=?' + (' FOR UPDATE' if self.postgres else ''),
+                                    (replacement_source_id,)).fetchone() if replacement_source_id else None
+            if replacement_source_id and not replacement:
+                raise ValueError('Source to replace was not found.')
+            if replacement and (replacement['lease_until'] > now or result['skipped']):
+                raise ValueError('Wait for any active check and resolve skipped rows before replacing a source.')
             if config['url']:
-                for existing in c.execute('SELECT config FROM sources'):
-                    if json.loads(existing['config'])['url'] == config['url']:
+                for existing in c.execute('SELECT id,config FROM sources'):
+                    if existing['id'] != replacement_source_id and json.loads(existing['config'])['url'] == config['url']:
                         raise ValueError('This URL is already connected. Use Check now on its existing source.')
-            source_id = uuid.uuid4().hex
+            source_id = replacement_source_id or uuid.uuid4().hex
             validators = json.loads(row['validators'])
             uploaded = config['kind'] == 'upload'
             state = 'snapshot' if uploaded else ('review' if result['skipped'] else 'ready')
-            c.execute('''INSERT INTO sources(id,config,enabled,state,created,next_check,last_attempt,last_success,changed_at,etag,modified,content_hash,upload,error)
+            if replacement:
+                c.execute('''UPDATE sources SET config=?,enabled=?,state=?,next_check=?,last_attempt=?,last_success=?,changed_at=?,
+                             etag=?,modified=?,content_hash=?,upload=?,error=NULL,failure_count=0,lease_until=0 WHERE id=?''',
+                          (json.dumps(config),int(not uploaded),state,now+config['interval_minutes']*60,now,now,now,
+                           validators.get('etag'),validators.get('modified'),validators.get('hash'),row['content'] if uploaded else None,source_id))
+            else:
+                c.execute('''INSERT INTO sources(id,config,enabled,state,created,next_check,last_attempt,last_success,changed_at,etag,modified,content_hash,upload,error)
                          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                       (source_id, json.dumps(config), int(not uploaded), state, now, now + config['interval_minutes'] * 60,
                        now, now, now, validators.get('etag'), validators.get('modified'), validators.get('hash'),
                        row['content'] if uploaded else None,
                        f"{result['skipped']} row(s) skipped. Automatic checks require an entirely valid parse." if result['skipped'] else None))
-            self._apply(c, source_id, result['rows'], now, mark_missing=False)
-            self._run(c, source_id, state, len(result['rows']), len(result['rows']), 'Initial preview approved by administrator.')
+            changed = self._apply(c, source_id, result['rows'], now, mark_missing=bool(replacement))
+            self._run(c, source_id, state, len(result['rows']), changed,
+                      'Replacement preview approved by administrator.' if replacement else 'Initial preview approved by administrator.')
             c.execute('DELETE FROM previews WHERE id=?', (preview_id,))
             return source_id
 
@@ -227,6 +253,16 @@ class Store:
         sources = {s['id']: s for s in self.list_sources()}
         with self.connect() as c:
             observations = c.execute('SELECT * FROM observations WHERE hidden=0').fetchall()
+        from .badslava import supports as badslava_source
+        from .comediq import supports as comediq_source
+        calendar_slots = defaultdict(set)
+        for o in observations:
+            source = sources.get(o['source_id'])
+            if source and badslava_source(source['config']['url']) and not o['missing_count']:
+                p = json.loads(o['payload'])
+                slot = venue_slot(p)
+                if slot and key(p['name']) == key('Open Mic'):
+                    calendar_slots[slot].add((p['name'], p['venue']))
         grouped = defaultdict(list)
         for o in observations:
             source = sources.get(o['source_id'])
@@ -234,7 +270,17 @@ class Store:
                 continue
             payload = json.loads(o['payload'])
             schedule = payload['date'] or f"weekly:{payload['weekday']}"
-            identity = f"{key(payload['name'])}|{key(payload['venue'])}|{key(payload['borough'])}|{schedule}"
+            name, venue = payload['name'], payload['venue']
+            unmatched_slot = None
+            if comediq_source(source['config']['url']):
+                matches = calendar_slots.get(venue_slot(payload), set())
+                if len(matches) == 1:
+                    name, venue = next(iter(matches))
+                else:
+                    unmatched_slot = digest(venue_slot(payload))[:16]
+            identity = f"{key(name)}|{key(venue)}|{key(payload['borough'])}|{schedule}"
+            if unmatched_slot:
+                identity += '|comediq:' + unmatched_slot
             grouped[identity].append((dict(o), payload, source))
         final_groups = {}
         for identity, items in grouped.items():

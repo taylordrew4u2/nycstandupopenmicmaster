@@ -42,19 +42,28 @@ def authorize(header):
 
 
 async def run_due(store, sync_one, budget=220):
+    def summary():
+        sources = store.list_sources()
+        enabled = [s for s in sources if s['enabled'] and s['config']['kind'] != 'upload']
+        return {'enabled_sources': len(enabled),
+                'snapshot_sources': sum(s['config']['kind'] == 'upload' for s in sources),
+                'unhealthy_sources': sum(s['state'] in ('error', 'review') for s in enabled),
+                'due_remaining': sum(s['next_check'] <= time.time() for s in enabled)}
+
+    outcomes = {'checked': 0, 'updated': 0, 'unchanged': 0, 'failed': 0, 'review': 0, 'busy': 0}
+    results = []
     lease = secrets.token_hex(16)
     now = time.time()
     with store.connect() as c:
         c.execute('BEGIN IMMEDIATE')
         current = c.execute("SELECT value FROM meta WHERE key='sync_lease'").fetchone()
         if current and float(current[0].split(':', 1)[0]) > now:
-            return {'state': 'busy', 'checked': 0}
+            return {'state': 'busy', **outcomes, **summary(), 'results': results}
         c.execute("INSERT INTO meta(key,value) VALUES('sync_lease',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                   (f'{now + 330}:{lease}',))
-    checked = 0
     deadline = time.monotonic() + budget
     try:
-        due = sorted((s for s in store.list_sources() if s['enabled'] and s['next_check'] <= now
+        due = sorted((s for s in store.list_sources() if s['enabled'] and s['config']['kind'] != 'upload' and s['next_check'] <= now
                       and s['lease_until'] < now), key=lambda s: s['next_check'])
         for source in due:
             if deadline - time.monotonic() < 65:
@@ -63,15 +72,22 @@ async def run_due(store, sync_one, budget=220):
             if not current or not current['enabled'] or current['next_check'] > time.time():
                 continue
             try:
-                await asyncio.wait_for(sync_one(source['id']), timeout=60)
+                result = await asyncio.wait_for(sync_one(source['id']), timeout=60)
             except asyncio.TimeoutError:
-                store.failure(source['id'], 'Source check timed out. Existing listings kept.')
-            checked += 1
+                result = {'state': 'error', 'message': 'Source check timed out. Existing listings kept.'}
+                store.failure(source['id'], result['message'])
+            if not isinstance(result, dict) or result.get('state') not in ('updated', 'unchanged', 'error', 'review', 'busy'):
+                result = {'state': 'error', 'message': 'Source check returned an invalid outcome. Existing listings kept.'}
+                store.failure(source['id'], result['message'])
+            state = result['state']
+            outcomes['checked'] += 1
+            outcomes['failed' if state == 'error' else state] += 1
+            results.append({'source_id': source['id'], **{k: result[k] for k in ('state', 'message', 'imported', 'changed') if k in result}})
         from .geocoding import geocode_pending
         await geocode_pending(store, deadline=deadline)
         with store.connect() as c:
             c.execute("INSERT INTO meta(key,value) VALUES('worker_heartbeat',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(time.time()),))
-        return {'state': 'complete', 'checked': checked}
+        return {'state': 'complete', **outcomes, **summary(), 'results': results}
     finally:
         with store.connect() as c:
             c.execute("DELETE FROM meta WHERE key='sync_lease' AND value=?", (f'{now + 330}:{lease}',))

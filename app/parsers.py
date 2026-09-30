@@ -319,6 +319,9 @@ def normalize_rows(raw_rows, config):
     return rows, warnings, skipped
 
 def extract(content: bytes, config: SourceConfig, content_type='', filename=''):
+    from .comediq import supports as supports_comediq, extract_feed
+    if config.kind in ('auto', 'json') and supports_comediq(config.url):
+        return extract_feed(content, config)
     kind = config.kind
     path = urlsplit(config.url or filename).path.lower()
     if kind in ('auto', 'upload'):

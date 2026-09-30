@@ -3,12 +3,10 @@ import asyncio
 import contextlib
 import csv
 import hashlib
-import hmac
 import io
 import json
 import logging
 import os
-import secrets
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -19,7 +17,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .fetcher import SafeFetcher, FetchError, MAX_BYTES, validate_url
-from .models import SourceConfig, SourceUpdate, PreviewCommit, Login, VisibilityUpdate
+from .models import SourceConfig, SourceUpdate, PreviewCommit, Login, AdminPasswordUpdate, VisibilityUpdate
+from .admin_auth import AdminAuth
 from .parsers import extract, FIELDS
 from .store import Store, digest
 
@@ -36,13 +35,7 @@ def create_app(db_path=None):
     store = Store(database)
     fetcher = SafeFetcher()
     local_dev = not on_vercel and os.getenv('LOCAL_DEV', '0') == '1'
-    password = os.getenv('ADMIN_PASSWORD', '')
-    configured = bool(password)
-    weak_password = len(password) < 15
-    salt = secrets.token_bytes(24)
-    password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 600000) if configured else b''
-    revision = hashlib.sha256(password.encode()).hexdigest()
-    del password
+    auth = AdminAuth(store, os.getenv('ADMIN_PASSWORD', ''))
     background_worker = not on_vercel and os.getenv('SCHEDULER_ENABLED', '1') == '1'
     scheduler_enabled = background_worker or os.getenv('GITHUB_SYNC_ENABLED') == '1' or len(os.getenv('CRON_SECRET', '')) >= 32
 
@@ -54,19 +47,26 @@ def create_app(db_path=None):
             raise HTTPException(400, 'This is an uploaded snapshot. Import a replacement file to change it, or use an online file URL for automatic syncing.')
         if not store.acquire(source_id):
             return {'state': 'busy', 'message': 'A check is already running.'}
+        source = store.get_source(source_id)
+        if source['config']['kind'] == 'upload':
+            with store.connect() as c:
+                c.execute('UPDATE sources SET lease_until=0 WHERE id=?', (source_id,))
+            raise HTTPException(400, 'This source was replaced by an uploaded snapshot and cannot auto-sync.')
         try:
-            result = await fetcher.fetch(source['config']['url'], source['etag'], source['modified'])
+            from .comediq import supports as comediq_source
+            rolling_dates = comediq_source(source['config']['url'])
+            result = await fetcher.fetch(source['config']['url'], None if rolling_dates else source['etag'], None if rolling_dates else source['modified'])
             validators = {'etag': result['headers'].get('Etag') or result['headers'].get('ETag'),
                           'modified': result['headers'].get('Last-Modified')}
             if result['status'] == 304:
                 # A 304 after a partially approved preview must not erase its review state.
-                if source['state'] == 'review':
+                if source['state'] == 'review' or rolling_dates:
                     result = await fetcher.fetch(source['config']['url'])
                 else:
                     return store.success(source_id, [], validators, unchanged=True)
             content_hash = digest(result['content'])
             validators['hash'] = content_hash
-            if content_hash == source['content_hash'] and source['state'] != 'review':
+            if content_hash == source['content_hash'] and source['state'] != 'review' and not rolling_dates:
                 return store.success(source_id, [], validators, unchanged=True)
             parsed = await asyncio.to_thread(extract, result['content'], SourceConfig(**source['config']), result['headers'].get('Content-Type', ''))
             if not parsed['rows'] or parsed['skipped']:
@@ -96,9 +96,9 @@ def create_app(db_path=None):
 
     @asynccontextmanager
     async def lifespan(app):
-        if configured and weak_password:
+        if auth.configured and auth.bootstrap['weak_password']:
             log.warning('The administrator password is short. Replace it before public launch.')
-        if not configured:
+        if not auth.configured:
             log.warning('Admin is locked. Set ADMIN_PASSWORD on the server to enable administration.')
         task = asyncio.create_task(worker()) if background_worker else None
         yield
@@ -111,6 +111,7 @@ def create_app(db_path=None):
     app.state.store = store
     app.state.fetcher = fetcher
     app.state.sync_one = sync_one
+    app.state.admin_auth = auth
 
     @app.middleware('http')
     async def security_headers(request, call_next):
@@ -139,13 +140,10 @@ def create_app(db_path=None):
         return response
 
     def admin(request: Request):
-        token = request.cookies.get('miclist_session', '')
-        with store.connect() as c:
-            session = c.execute('SELECT * FROM sessions WHERE token_hash=? AND expires>? AND revision=?',
-                                (hashlib.sha256(token.encode()).hexdigest(), time.time(), revision)).fetchone()
-        if not configured or not token or not session:
-            raise HTTPException(401, 'Sign in to manage your sources.')
-        return True
+        return auth.session(request.cookies.get('miclist_session', ''))
+
+    def admin_ip(request: Request):
+        return hashlib.sha256((request.client.host if request.client else 'unknown').encode()).hexdigest()
 
     def check_config(config):
         if not config.permission_confirmed:
@@ -160,35 +158,25 @@ def create_app(db_path=None):
     @app.get('/api/session')
     async def session_info(request: Request):
         try:
-            admin(request)
+            credential = await asyncio.to_thread(admin, request)
             authenticated = True
         except HTTPException:
             authenticated = False
-        return {'authenticated': authenticated, 'configured': configured, 'weak_password': weak_password if authenticated else None}
+        return {'authenticated': authenticated, 'configured': auth.configured,
+                'weak_password': credential['weak_password'] if authenticated else None}
 
     @app.post('/api/login')
     async def login(body: Login, request: Request, response: Response):
-        if not configured:
-            raise HTTPException(503, 'Set ADMIN_PASSWORD on the server before signing in.')
-        ip = hashlib.sha256((request.client.host if request.client else 'unknown').encode()).hexdigest()
-        now = time.time()
-        with store.connect() as c:
-            c.execute('BEGIN IMMEDIATE')
-            c.execute('DELETE FROM attempts WHERE created<?', (now - 900,))
-            count = c.execute('SELECT COUNT(*) FROM attempts WHERE ip_hash=?', (ip,)).fetchone()[0]
-            if count >= 8:
-                raise HTTPException(429, 'Too many attempts. Try again in 15 minutes.')
-            c.execute('INSERT INTO attempts VALUES (?,?)', (ip, now))
-        candidate = await asyncio.to_thread(hashlib.pbkdf2_hmac, 'sha256', body.password.encode(), salt, 600000)
-        if not hmac.compare_digest(candidate, password_hash):
-            raise HTTPException(401, 'Incorrect password.')
-        token = secrets.token_urlsafe(40)
-        with store.connect() as c:
-            c.execute('DELETE FROM sessions WHERE expires<? OR revision!=?', (now, revision))
-            c.execute('DELETE FROM attempts WHERE ip_hash=?', (ip,))
-            c.execute('INSERT INTO sessions VALUES (?,?,?)', (hashlib.sha256(token.encode()).hexdigest(), now + 43200, revision))
+        token = await asyncio.to_thread(auth.login, body.password, admin_ip(request))
         response.set_cookie('miclist_session', token, max_age=43200, httponly=True, secure=not local_dev, samesite='strict', path='/')
         return {'authenticated': True}
+
+    @app.post('/api/admin/password', dependencies=[Depends(admin)])
+    async def change_admin_password(body: AdminPasswordUpdate, request: Request, response: Response):
+        weak = await asyncio.to_thread(auth.change_password, request.cookies.get('miclist_session', ''),
+                                      body.current_password, body.new_password, admin_ip(request))
+        response.delete_cookie('miclist_session', path='/')
+        return {'authenticated': False, 'signin_required': True, 'weak_password': weak}
 
     @app.post('/api/logout')
     async def logout(request: Request, response: Response):
@@ -263,7 +251,7 @@ def create_app(db_path=None):
     @app.post('/api/sources', dependencies=[Depends(admin)])
     async def commit(body: PreviewCommit):
         try:
-            return {'id': store.commit_preview(body.preview_id)}
+            return {'id': store.commit_preview(body.preview_id, body.replacement_source_id)}
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
 
