@@ -140,6 +140,8 @@ def create_app(db_path=None):
             'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
             'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
         })
+        if request.url.path == '/shop':
+            response.headers['Content-Security-Policy'] = response.headers['Content-Security-Policy'].replace("connect-src 'self'", "connect-src 'self' https://storefront-api.fourthwall.com").replace("img-src 'self' data: https://tile.openstreetmap.org", "img-src 'self' data: https://*.fourthwall.com")
         if request.url.path.startswith('/api/'):
             response.headers['Cache-Control'] = 'no-store'
         if request.url.path in ('/admin', '/owner', '/claim', '/submit'):
@@ -346,6 +348,18 @@ def create_app(db_path=None):
         from .about import save_content
         save_content(store, body)
         return {'ok': True}
+
+    @app.get('/api/shop/config')
+    async def shop_config():
+        token = os.getenv('FOURTHWALL_STOREFRONT_TOKEN', '')
+        if not token.startswith('ptkn_'):
+            raise HTTPException(503, 'Shop connection is not configured.')
+        # Storefront tokens are public by design; Open API credentials never belong here.
+        return {'storefrontToken': token}
+
+    @app.get('/shop')
+    async def shop():
+        return FileResponse(ROOT / 'assets' / 'shop.html')
 
     @app.get('/about')
     async def about():
