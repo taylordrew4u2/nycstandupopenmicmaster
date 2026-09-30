@@ -121,7 +121,12 @@ def create_app(db_path=None):
             origin = request.headers.get('origin')
             allowed = os.getenv('PUBLIC_ORIGIN', '').rstrip('/')
             expected = str(request.base_url).rstrip('/')
-            if origin and origin.rstrip('/') not in ({allowed} if allowed else {expected}):
+            trusted_origins = {allowed} if allowed else {expected}
+            # Keep the explicitly configured legacy origin working during domain migration.
+            # Never trust arbitrary Origin or forwarded-host values.
+            if on_vercel or allowed == 'https://nycstandupopenmicmaster.vercel.app':
+                trusted_origins.add('https://nycopenmicmasterlist.com')
+            if origin and origin.rstrip('/') not in trusted_origins:
                 return JSONResponse({'detail': 'Cross-origin writes are not allowed.'}, status_code=403)
             try:
                 content_length = int(request.headers.get('content-length', '0') or 0)
@@ -346,11 +351,11 @@ def create_app(db_path=None):
 
     @app.get('/robots.txt')
     async def robots():
-        return Response('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://nycstandupopenmicmaster.vercel.app/sitemap.xml\n', media_type='text/plain')
+        return Response('User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: https://nycopenmicmasterlist.com/sitemap.xml\n', media_type='text/plain')
 
     @app.get('/sitemap.xml')
     async def sitemap():
-        return Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://nycstandupopenmicmaster.vercel.app/</loc></url><url><loc>https://nycstandupopenmicmaster.vercel.app/about</loc></url></urlset>', media_type='application/xml')
+        return Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://nycopenmicmasterlist.com/</loc></url><url><loc>https://nycopenmicmasterlist.com/about</loc></url></urlset>', media_type='application/xml')
 
     @app.get('/admin')
     @app.get('/owner')

@@ -173,3 +173,11 @@ body:has(.host-page) #main{flex:1;min-height:0;overflow:hidden}
 .proposal-status{padding:12px;border:1px solid var(--line);background:#fff;font-size:12px;overflow-wrap:anywhere}.proposal-status h2{font-size:15px;margin:0 0 8px}.proposal-status p{margin:8px 0}.proposal-status label{display:block;font-size:11px;margin:16px 0 4px}.proposal-status input{width:100%;min-width:0;height:30px;font-size:11px;padding:5px;border:1px solid var(--line)}.proposal-status .queue-buttons{margin:8px 0}.proposal-reply{padding:8px;background:#f2f5fa;border-left:2px solid #245da7;white-space:pre-wrap}
 @media(max-height:480px) and (min-width:560px){.proposal-status{padding:8px}.proposal-status label{margin-top:8px}}
 .about-editor{max-width:680px;display:grid;gap:12px}.about-editor .field{margin:8px 0}.about-editor .field label{font-size:12px;margin-bottom:4px}.about-editor textarea{min-height:90px;height:110px;font-size:13px;padding:8px}.about-editor input{font-size:13px;padding:7px}.about-editor>button{justify-self:start}
+
+/* Final compact interaction polish. */
+.field .form-helper:empty{display:none}.directory-loading{padding:12px;color:var(--muted);font-size:12px}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid #245da7;outline-offset:2px}
+#main:focus{outline:none}.site-menu summary{cursor:pointer}.site-menu nav a:hover,.site-menu nav button:hover{background:#e8eef7;color:#143f77}
+.button:disabled,.compact-button:disabled{cursor:default}.form-error:focus{outline:2px solid #a33828;outline-offset:2px}
+@media(max-width:650px){.last-sync{font-size:9px}#modal input,#modal select,#modal textarea{font-size:16px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}

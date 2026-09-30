@@ -163,3 +163,24 @@ def test_missing_source_rows_stay_published_until_admin_hides(clients):
     assert admin.patch('/api/admin/mics/'+missing['id']+'/visibility',json={'hidden':True}).status_code==200
     store.success(sid,parsed['rows'],{})
     assert missing['id'] not in {r['id'] for r in visitor.get('/api/public').json()['listings']}
+
+
+def test_custom_domain_origin_migration_stays_strict(clients, monkeypatch):
+    app, admin, visitor = clients
+    monkeypatch.setenv('PUBLIC_ORIGIN','https://nycstandupopenmicmaster.vercel.app')
+    body={'token':'x'*40}
+    for origin in ['https://nycopenmicmasterlist.com','https://nycstandupopenmicmaster.vercel.app']:
+        assert visitor.post('/api/mic-proposals/status',json=body,headers={'Origin':origin}).status_code==404
+    for origin in ['https://attacker.invalid','http://nycopenmicmasterlist.com','https://nycopenmicmasterlist.com.attacker.invalid']:
+        assert visitor.post('/api/mic-proposals/status',json=body,headers={'Origin':origin}).status_code==403
+
+
+def test_custom_domain_search_metadata(clients):
+    from bs4 import BeautifulSoup
+    _, _, visitor=clients
+    for path in ['/','/about']:
+        doc=BeautifulSoup(visitor.get(path).text,'html.parser')
+        assert doc.find('link',rel='canonical')['href']=='https://nycopenmicmasterlist.com'+path
+        assert doc.find('meta',property='og:url')['content']=='https://nycopenmicmasterlist.com'+path
+    assert 'https://nycopenmicmasterlist.com/sitemap.xml' in visitor.get('/robots.txt').text
+    assert 'vercel.app' not in visitor.get('/sitemap.xml').text

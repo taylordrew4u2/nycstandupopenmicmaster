@@ -27,10 +27,10 @@ let toastTimer;
 function toast(message){const t=$('#toast');t.textContent=message;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.hidden=true,6500);}
 function modal(title,body,foot='',eyebrow='NYC Open Mic Master List'){
   $('#modal').removeAttribute('data-view');
-  $('#modal-content').innerHTML=`<div class="modal-head"><div><div class="eyebrow muted">${esc(eyebrow)}</div><h2>${esc(title)}</h2></div><button class="close-button" data-action="close" aria-label="Close dialog">×</button></div><div class="modal-body">${body}</div>${foot?`<div class="modal-foot">${foot}</div>`:''}`;
+  $('#modal-content').innerHTML=`<div class="modal-head"><div><div class="eyebrow muted">${esc(eyebrow)}</div><h2 id="modal-title">${esc(title)}</h2></div><button class="close-button" data-action="close" aria-label="Close dialog">×</button></div><div class="modal-body">${body}</div>${foot?`<div class="modal-foot">${foot}</div>`:''}`;
   if(!$('#modal').open)$('#modal').showModal();
 }
-function errorAt(form,err){let el=$('.form-error',form);if(!el){el=document.createElement('div');el.className='form-error';el.setAttribute('role','alert');form.prepend(el);}el.textContent=err.message;}
+function errorAt(form,err){let el=$('.form-error',form);if(!el){el=document.createElement('div');el.className='form-error';el.setAttribute('role','alert');form.prepend(el);}el.textContent=err.message;el.tabIndex=-1;el.focus({preventScroll:true});}
 function button(text,action,id='',cls='quiet'){return `<button class="button ${cls}" data-action="${action}" data-id="${esc(id)}">${text}</button>`;}
 function blank(title,description,actions=''){return `<div class="blank-state"><h3>${esc(title)}</h3><p>${description}</p>${actions}</div>`;}
 function field(label,name,value='',type='text',required=false,helper=''){
@@ -52,6 +52,8 @@ function showLastSync(value){
 }
 async function loadSyncStatus(){try{const status=await api('/api/sync-status');showLastSync(status.last_sync_at);}catch{if($('#last-sync'))$('#last-sync').textContent='LAST SYNC AT unavailable';}}
 async function loadPublic(){
+  if(!map)map=new MicMap($('#nyc-map'),id=>details(id));
+  if(!state.data.listings.length&&!state.demo)$('#cards').innerHTML='<p class="directory-loading" role="status">Loading mics…</p>';
   if(state.demo){state.data=demoData();renderDirectory();return;}
   try{state.data=await api('/api/public');renderDirectory();}catch(err){$('#directory-status').textContent='Directory unavailable';$('#cards').innerHTML=blank('Could not load the directory.',esc(err.message),button('Try again','refresh'));}
 }
@@ -74,7 +76,7 @@ const claimBadge=r=>`<span class="claim-status ${r.claimed?'is-claimed':''}" tit
 const micTitle=r=>r.name;
 const updatedAt=r=>Math.max(r.updated_at||0,r.curated_at||0);
 const updatedText=r=>updatedAt(r)?new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}).format(new Date(updatedAt(r)*1000)):'not recorded';
-const micLink=id=>new URL('/?mic='+encodeURIComponent(id),location.origin==='null'?'https://nycstandupopenmicmaster.vercel.app':location.origin).href;
+const micLink=id=>new URL('/?mic='+encodeURIComponent(id),location.origin==='null'?'https://nycopenmicmasterlist.com':location.origin).href;
 function withinTime(time,from,to){if(!from&&!to)return true;if(!time)return false;return from&&to&&from>to?time>=from||time<=to:(!from||time>=from)&&(!to||time<=to);}
 function filtered(){return state.data.listings.filter(r=>{
   if(state.claimStatus==='claimed'&&!r.claimed)return false;if(state.claimStatus==='unclaimed'&&r.claimed)return false;
@@ -177,6 +179,8 @@ async function renderAdminBody(){const root=$('#admin-body'),a=state.admin,c=sta
     root.innerHTML='<p>Loading About page…</p>';
     try{const content=await api('/api/admin/about');if(state.adminTab!=='about')return;
       root.innerHTML=`<div class="admin-list-heading"><h2>Edit About page</h2><a href="/about" target="_blank" rel="noopener" class="text-link">View page</a></div><form id="about-form" class="about-editor"><div class="host-tabs" aria-label="About sections">${[['intro','Intro'],['why','Why'],['how','How'],['seo','SEO']].map(([id,label])=>`<button type="button" data-about-tab="${id}" aria-pressed="${id==='intro'}" class="${id==='intro'?'active':''}">${label}</button>`).join('')}</div><div data-about-panel="intro">${field('Page heading','title',content.title,'text',true)}${textField('Introduction','intro',content.intro)}</div><div data-about-panel="why" hidden>${field('Section heading','why_heading',content.why_heading)}${textField('Why you built it / about you','why',content.why)}</div><div data-about-panel="how" hidden>${field('Section heading','how_heading',content.how_heading)}${textField('How listings work','how',content.how)}${textField('Host information','hosts',content.hosts)}</div><div data-about-panel="seo" hidden>${textField('Search description (up to 300 characters)','seo_description',content.seo_description)}<p class="form-helper">Used in search and link previews. Plain text only.</p></div><button type="submit" class="button primary">Save About page</button></form>`;
+      for(const [name,max]of Object.entries({title:120,intro:1200,why_heading:120,why:2400,how_heading:120,how:2400,hosts:1200,seo_description:300})){$('#about-form [name='+name+']').maxLength=max;}
+      $('#about-form [name=seo_description]').required=true;
       $('#about-form').dataset.original=JSON.stringify(Object.fromEntries(new FormData($('#about-form'))));
     }catch(err){root.innerHTML=blank('About editor unavailable.',esc(err.message));}
     return;
@@ -243,6 +247,7 @@ function hostTab(tab){
   $$('[data-host-panel]').forEach(p=>p.hidden=p.dataset.hostPanel!==tab);
   $$('[data-host-tab]').forEach(b=>{const active=b.dataset.hostTab===tab;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
 }
+function aboutDirty(){const f=$('#about-form');return !!f&&JSON.stringify(Object.fromEntries(new FormData(f)))!==f.dataset.original;}
 function hostDirty(){const f=$('#host-edit-form');if(!f)return false;return JSON.stringify(Object.fromEntries(new FormData(f)))!==f.dataset.original;}
 function hostMic(){return state.owner?.listings.find(r=>r.id===state.ownerMic);}
 function renderHostEditor(){
@@ -355,7 +360,7 @@ document.addEventListener('click',async e=>{
   const aboutButton=e.target.closest('[data-about-tab]');if(aboutButton){$$('[data-about-panel]').forEach(p=>p.hidden=p.dataset.aboutPanel!==aboutButton.dataset.aboutTab);$$('[data-about-tab]').forEach(b=>{const active=b===aboutButton;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});return;}
   const submissionButton=e.target.closest('[data-submission-tab]');if(submissionButton){submissionTab(submissionButton.dataset.submissionTab);return;}
   const hostButton=e.target.closest('[data-host-tab]');if(hostButton){hostTab(hostButton.dataset.hostTab);return;}
-  const tab=e.target.closest('[data-admin-tab]');if(tab){state.adminTab=tab.dataset.adminTab;$$('[data-admin-tab]').forEach(t=>t.classList.toggle('active',t===tab));renderAdminBody();return;}
+  const tab=e.target.closest('[data-admin-tab]');if(tab){if(tab.dataset.adminTab!==state.adminTab&&aboutDirty()&&!confirm('Discard unsaved About page changes?'))return;state.adminTab=tab.dataset.adminTab;$$('[data-admin-tab]').forEach(t=>t.classList.toggle('active',t===tab));renderAdminBody();return;}
   const el=e.target.closest('[data-action]');if(!el)return;const action=el.dataset.action,id=el.dataset.id;e.preventDefault();
   try{
     if(action==='proposal-refresh')await renderProposalStatus();
@@ -365,7 +370,7 @@ document.addEventListener('click',async e=>{
     if(action==='donate'){modal('Donate','<p>Support NYC Open Mic Master List.</p><div class="donation-options"><button class="button quiet" disabled>Cash App</button><button class="button quiet" disabled>Venmo</button></div><p class="form-helper">Donation links coming soon.</p>');}
 
     if(action==='refresh'){await loadPublic();toast('Loaded the latest saved listings.');}
-    if(action==='reset'){Object.assign(state,{day:'all',borough:'all',search:'',cost:'all',signup:'all',claimStatus:'all',timeFrom:'',timeTo:''});$('#search').value='';if($('#claim-filter'))$('#claim-filter').value='all';if($('#cost'))$('#cost').value='all';if($('#signup-filter'))$('#signup-filter').value='all';if($('#time-from'))$('#time-from').value='';if($('#time-to'))$('#time-to').value='';renderDirectory();}
+    if(action==='reset'){Object.assign(state,{day:'all',borough:'all',search:'',cost:'all',signup:'all',claimStatus:'all',timeFrom:'',timeTo:'',sort:'time'});if($('#sort'))$('#sort').value='time';$('#search').value='';if($('#claim-filter'))$('#claim-filter').value='all';if($('#cost'))$('#cost').value='all';if($('#signup-filter'))$('#signup-filter').value='all';if($('#time-from'))$('#time-from').value='';if($('#time-to'))$('#time-to').value='';renderDirectory();}
     if(action==='filters')filtersDialog();
     if(action==='previous-page'||action==='next-page'){state.page+=action==='next-page'?1:-1;renderCards();}
     if(action==='detail-tab')details(id,el.dataset.tab,Number(el.dataset.page||0));
@@ -391,7 +396,7 @@ document.addEventListener('click',async e=>{
     if(action==='observation-toggle'){const [s,r,h]=id.split('|');await api(`/api/listings/${s}/${r}/visibility`,{method:'PATCH',body:{hidden:h==='1'}});await loadPublic();await renderAdmin();}
     if(action==='admin-refresh')await renderAdmin();
     if(action==='admin-password'){modal('Change admin password',`<form id="admin-password-form">${field('Current password','current_password','','password',true)}${field('New password','new_password','','password',true)}${field('Confirm new password','confirm_password','','password',true)}<p class="form-helper">A long, unique password protects the directory. Changing it signs out all admin sessions.</p><button type="submit" class="button primary">Change password</button></form>`);}
-    if(action==='admin-logout'){await api('/api/logout',{method:'POST'});state.admin=null;state.community=null;await renderAdmin();}
+    if(action==='admin-logout'){if(aboutDirty()&&!confirm('Discard unsaved About page changes and sign out?'))return;await api('/api/logout',{method:'POST'});state.admin=null;state.community=null;await renderAdmin();}
     if(action==='owner-refresh')await renderOwner();
     if(action==='owner-password'){if(hostDirty()){toast('Save your mic changes before changing your password.');return;}modal('Change your password',`<form id="owner-password-form">${field('Current password','current_password','','password',true)}${field('New password (15+ characters)','new_password','','password',true)}${field('Confirm new password','confirm_password','','password',true)}<p class="form-helper">This signs out all your host sessions.</p><button type="submit" class="button primary">Change password</button></form>`);$$('input[name=new_password],input[name=confirm_password]',$('#owner-password-form')).forEach(i=>{i.minLength=15;i.autocomplete='new-password';});}
     if(action==='owner-logout'){if(hostDirty()&&!confirm('Discard unsaved changes and sign out?'))return;await api('/api/owner/logout',{method:'POST'});state.owner=null;await renderOwner();}
@@ -431,10 +436,10 @@ document.addEventListener('change',async e=>{const t=e.target;try{
   if(t.dataset.sourceInterval){await api(`/api/sources/${t.dataset.sourceInterval}`,{method:'PATCH',body:{interval_minutes:Number(t.value)}});toast('Refresh interval updated.');await renderAdmin();}
   if(t.dataset.sourcePriority){await api(`/api/sources/${t.dataset.sourcePriority}`,{method:'PATCH',body:{priority:Number(t.value)}});toast('Source priority updated.');await loadPublic();await renderAdmin();}
 }catch(err){toast(err.message);}});
-document.addEventListener('invalid',e=>{const panel=e.target.closest('[data-host-panel]');if(panel)hostTab(panel.dataset.hostPanel);const submission=e.target.closest('[data-submission-panel]');if(submission)submissionTab(submission.dataset.submissionPanel);},true);
-window.addEventListener('beforeunload',e=>{if(hostDirty()){e.preventDefault();e.returnValue='';}});
+document.addEventListener('invalid',e=>{const panel=e.target.closest('[data-host-panel]');if(panel)hostTab(panel.dataset.hostPanel);const submission=e.target.closest('[data-submission-panel]');if(submission)submissionTab(submission.dataset.submissionPanel);const about=e.target.closest('[data-about-panel]');if(about)$('[data-about-tab='+about.dataset.aboutPanel+']').click();},true);
+window.addEventListener('beforeunload',e=>{if(hostDirty()||aboutDirty()){e.preventDefault();e.returnValue='';}});
 document.addEventListener('input',e=>{if(e.target.closest('#host-edit-form'))$('#host-save-state').textContent=hostDirty()?'Unsaved changes':'Your edits are protected from imports.';if(e.target.id==='search'){state.search=e.target.value.toLowerCase().trim();renderDirectory();}if(e.target.id==='admin-search')renderAdminMics(e.target.value.toLowerCase().trim());});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#site-menu'))$('#site-menu').open=false;if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!$('#modal').open&&location.pathname==='/'){e.preventDefault();$('#search').focus();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#site-menu')?.open){$('#site-menu').open=false;$('#site-menu summary').focus();}if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!$('#modal').open&&location.pathname==='/'){e.preventDefault();$('#search').focus();}});
 $('#modal').addEventListener('click',e=>{if(e.target===$('#modal'))$('#modal').close();});
 async function boot(){
   if(location.pathname!=='/'&&!window.MICLIST_PREVIEW)loadSyncStatus();

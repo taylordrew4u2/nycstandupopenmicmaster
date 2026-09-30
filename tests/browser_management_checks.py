@@ -84,7 +84,9 @@ def run():
             assert page.locator('.mic-card').count()==0
             page.locator('#claim-filter').select_option('claimed')
             assert page.locator('.mic-card').count()==1
+            page.locator('#sort').select_option('price')
             page.get_by_role('button',name='Reset',exact=True).click()
+            assert page.locator('#sort').input_value()=='time'
             assert page.locator('#claim-filter').input_value()=='all'
             page.get_by_role('button',name='Done',exact=True).click()
             page.locator('.mic-title').click()
