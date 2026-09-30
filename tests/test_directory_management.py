@@ -28,7 +28,7 @@ def clients(database, monkeypatch):
 
 
 def proposal(visitor, name='New test mic'):
-    data = {'name': 'Private Host', 'email': 'private@example.com',
+    data = {'request_host_access': True, 'name': 'Private Host', 'email': 'private@example.com',
             'message': 'I run this mic; verify with the venue manager.',
             'fields': {'name': name, 'venue': 'Example Venue', 'address': '1 Broadway',
                        'borough': 'Manhattan', 'weekday': 'Wednesday', 'start_time': '19:00', 'cost': 'Free'}}
@@ -230,3 +230,23 @@ def test_submission_schedule_choices(clients,frequency,date,anchor):
     row=visitor.get('/api/public').json()['listings'][0]
     assert row['frequency']==frequency
     assert row['date']==(date or None)
+
+@pytest.mark.parametrize('intent', [False, None])
+def test_listing_submission_does_not_grant_host_access(clients, intent):
+    app, admin, visitor = clients
+    data = {'name':'Mic visitor','email':'visitor@example.com','message':'Venue calendar confirms this mic.',
+            'fields':{'name':'Listing only mic','venue':'Example','address':'1 Broadway','borough':'Manhattan','weekday':'Wednesday','start_time':'19:00'}}
+    if intent is not None:
+        data['request_host_access'] = intent
+    response = visitor.post('/api/mic-proposals',json=data)
+    assert response.status_code == 201
+    token = response.json()['status_path'].split('#')[1]
+    entry = admin.get('/api/admin/community').json()['proposals'][0]
+    assert entry['request_host_access'] is False
+    approved = admin.post('/api/admin/mic-proposals/'+entry['id'],json={'action':'approve'})
+    assert approved.status_code == 200
+    assert approved.json()['invite_path'] is None
+    status = visitor.post('/api/mic-proposals/status',json={'token':token}).json()
+    assert status['state']=='approved' and not status['can_setup'] and not status['request_host_access']
+    assert admin.get('/api/admin/community').json()['submissions']==[]
+    assert len(visitor.get('/api/public').json()['listings'])==1
