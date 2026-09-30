@@ -61,8 +61,9 @@ def run():
             page.get_by_label('Start time',exact=True).fill('19:00')
             page.get_by_role('button',name='You',exact=True).click()
             page.get_by_label('Your name',exact=True).fill('Example Host')
-            page.get_by_label('Your host email',exact=True).fill('host@example.com')
-            page.get_by_label('How can we verify',exact=False).fill('The example venue manager can verify this test mic.')
+            page.get_by_label('Your email',exact=True).fill('host@example.com')
+            page.get_by_label('Source link / verification details',exact=True).fill('The example venue manager can verify this test mic.')
+            page.get_by_label('Are you requesting host access?').select_option('yes')
             page.get_by_role('button',name='Submit for review').click()
             page.wait_for_selector('#proposal-status-link')
             status_url=page.url
@@ -77,7 +78,7 @@ def run():
             assert page.locator('.visitor-counts strong').all_text_contents()==['1','1','1','1']
             page.locator('[data-admin-tab="proposals"]').click()
             page.on('dialog',lambda d:d.accept('Verified with the venue.') if d.type=='prompt' else d.accept())
-            page.get_by_role('button',name='Approve',exact=True).click()
+            page.get_by_role('button',name='Approve mic + host',exact=True).click()
             page.wait_for_selector('#toast')
             page.goto(status_url)
             page.get_by_role('link',name='Set up host password').click()

@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS mic_proposals (
  created REAL NOT NULL, reviewed REAL, reply TEXT NOT NULL DEFAULT '',
  mic_id TEXT, claim_id TEXT
 );
+CREATE TABLE IF NOT EXISTS proposal_host_requests (
+ proposal_id TEXT PRIMARY KEY REFERENCES mic_proposals(id) ON DELETE CASCADE
+);
 CREATE TABLE IF NOT EXISTS owners (
  id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
  password_hash TEXT NOT NULL, created REAL NOT NULL
@@ -81,6 +84,7 @@ class MicProposal(BaseModel):
     email: str = Field(min_length=3, max_length=254)
     message: str = Field(min_length=10, max_length=3000)
     fields: dict
+    request_host_access: bool = False
     website: str = Field(default='', max_length=300)
 
 class ProposalDecision(BaseModel):
@@ -242,7 +246,7 @@ def register(app, store, admin, local_dev):
             raise HTTPException(400, 'Unable to submit this form.')
         email = email_value(body.email)
         if len(body.name.strip()) < 2 or len(body.message.strip()) < 10:
-            raise HTTPException(400, 'Include your name and how we can verify that you run this mic.')
+            raise HTTPException(400, 'Include your name and a source where we can verify this mic.')
         allowed = {'name', 'venue', 'address', 'borough', 'weekday', 'date', 'start_time', 'cost', 'frequency', 'recurrence_anchor'}
         if set(body.fields) - allowed:
             raise HTTPException(400, 'Unsupported mic submission fields.')
@@ -258,8 +262,10 @@ def register(app, store, admin, local_dev):
                 raise HTTPException(409, 'This mic is already awaiting review. Use the private status link from your first submission.')
             c.execute('INSERT INTO mic_proposals(id,token_hash,name,email,message,payload,fingerprint,created) VALUES (?,?,?,?,?,?,?,?)',
                       (proposal_id, token_hash(raw), body.name.strip(), email, body.message.strip(), json.dumps(payload), fingerprint, time.time()))
+            if body.request_host_access:
+                c.execute('INSERT INTO proposal_host_requests(proposal_id) VALUES (?)', (proposal_id,))
         return {'ok': True, 'status_path': '/submit#' + raw,
-                'message': 'Submitted for review. Save your private status link; it shows the decision and unlocks host setup if approved. No email has been sent.'}
+                'message': 'Submitted for review. Save your private status link; it shows the decision. Host setup is only available if you requested host access and it is approved. No email has been sent.'}
 
     @app.post('/api/mic-proposals/status')
     async def proposal_status(body: InvitationLookup, request: Request):
@@ -284,7 +290,8 @@ def register(app, store, admin, local_dev):
                     expires = invite['expires'] if invite else None
             return {'state': state, 'mic_name': json.loads(row['payload'])['name'], 'reply': row['reply'],
                     'created': row['created'], 'reviewed': row['reviewed'], 'mic_id': row['mic_id'],
-                    'can_setup': setup, 'expires_at': expires}
+                    'can_setup': setup, 'expires_at': expires,
+                    'request_host_access': bool(row['claim_id'] or c.execute('SELECT 1 FROM proposal_host_requests WHERE proposal_id=?', (row['id'],)).fetchone())}
 
     @app.post('/api/admin/mic-proposals/{proposal_id}', dependencies=[Depends(admin)])
     async def review_proposal(proposal_id: str, body: ProposalDecision):
@@ -311,18 +318,23 @@ def register(app, store, admin, local_dev):
             c.execute("INSERT INTO sources(id,config,enabled,state,created,next_check,last_success) VALUES ('manual',?,0,'snapshot',?,?,?) ON CONFLICT(id) DO NOTHING", (json.dumps(config), now, now, now))
             store._apply(c, 'manual', [payload], now, mark_missing=False)
             c.execute('INSERT INTO mic_registry VALUES (?,?,?)', ('manual', remote_key, mic_id))
-            c.execute("INSERT INTO submissions(id,mic_id,mic_name,kind,name,email,message,state,created,reviewed) VALUES (?,?,?,'claim',?,?,?,'approved',?,?)",
-                      (claim_id, mic_id, payload['name'], row['name'], row['email'], row['message'], row['created'], now))
-            # The private status capability becomes usable for approved setup.
-            # Only its hash is stored. A second one-use link can be shared by admin.
-            raw = secrets.token_urlsafe(40)
-            for hashed in (row['token_hash'], token_hash(raw)):
-                c.execute('INSERT INTO invitations VALUES (?,?,?,NULL)', (hashed, claim_id, now + 7*86400))
+            request_host_access = bool(c.execute('SELECT 1 FROM proposal_host_requests WHERE proposal_id=?', (proposal_id,)).fetchone())
+            raw = None
+            if request_host_access:
+                c.execute("INSERT INTO submissions(id,mic_id,mic_name,kind,name,email,message,state,created,reviewed) VALUES (?,?,?,'claim',?,?,?,'approved',?,?)",
+                          (claim_id, mic_id, payload['name'], row['name'], row['email'], row['message'], row['created'], now))
+                # The private status capability becomes usable for approved setup.
+                # Only its hash is stored. A second one-use link can be shared by admin.
+                raw = secrets.token_urlsafe(40)
+                for hashed in (row['token_hash'], token_hash(raw)):
+                    c.execute('INSERT INTO invitations VALUES (?,?,?,NULL)', (hashed, claim_id, now + 7*86400))
+            else:
+                claim_id = None
             c.execute("UPDATE mic_proposals SET state='approved',reviewed=?,reply=?,mic_id=?,claim_id=? WHERE id=?",
                       (now, body.reply, mic_id, claim_id, proposal_id))
             record(c, mic_id, 'admin', 'mic-submission-approved', proposal_id)
-            return {'ok': True, 'mic_id': mic_id, 'email': row['email'], 'invite_path': '/claim#' + raw,
-                    'message': 'Published. The submitter’s private status page now offers host setup. No email was sent.'}
+            return {'ok': True, 'mic_id': mic_id, 'email': row['email'], 'invite_path': '/claim#' + raw if raw else None,
+                    'message': 'Published. Host setup approved.' if request_host_access else 'Published as an unclaimed mic. No host account or invitation was created.'}
 
     @app.post('/api/mics/{mic_id}/submissions', status_code=201)
     async def submit(mic_id: str, body: Submission, request: Request):
@@ -369,7 +381,7 @@ def register(app, store, admin, local_dev):
     async def queue():
         with store.connect() as c:
             submissions=[dict(r) for r in c.execute('SELECT * FROM submissions ORDER BY created DESC LIMIT 1000')]
-            proposals=[{**{k:r[k] for k in ('id','name','email','message','state','created','reviewed','reply','mic_id','claim_id')},'listing':json.loads(r['payload'])} for r in c.execute('SELECT * FROM mic_proposals ORDER BY created DESC LIMIT 1000')]
+            proposals=[{**{k:r[k] for k in ('id','name','email','message','state','created','reviewed','reply','mic_id','claim_id')},'listing':json.loads(r['payload']),'request_host_access':bool(r['claim_id'] or c.execute('SELECT 1 FROM proposal_host_requests WHERE proposal_id=?',(r['id'],)).fetchone())} for r in c.execute('SELECT * FROM mic_proposals ORDER BY created DESC LIMIT 1000')]
             ownership=[dict(r) for r in c.execute('SELECT m.*,o.email,o.name FROM ownership m JOIN owners o ON o.id=m.owner_id')]
             audit=[dict(r) for r in c.execute('SELECT * FROM audit ORDER BY created DESC LIMIT 150')]
         return {'proposals':proposals,'submissions':submissions,'ownership':ownership,'audit':audit,'listings':store.public_data(include_hidden=True)['listings']}
