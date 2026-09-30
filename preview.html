@@ -117,9 +117,13 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 .claim-status.is-claimed{color:#245d32;border-color:#a9c5af;background:#e9f4eb}
 .popup-mic .claim-status{font:9px/13px var(--sans);margin-left:4px}
 
-/* The center of a venue dot is its coordinate, not the top of an offset pin. */
-.mic-pin{width:24px;height:24px;border-radius:50%;transform:translate(-50%,-50%);padding:0}
-.mic-pin.mic-cluster{width:30px;height:30px;background:#fff;color:#245da7;border:2px dashed #245da7;font-weight:bold}
+/* Pointed markers: the tip stays anchored to the mapped coordinate. */
+.mic-pin,.mic-pin.mic-cluster{width:28px;height:36px;transform:translate(-50%,calc(-100% + 1px));padding:0;border:0;border-radius:0;background:none;color:#245da7;box-shadow:none;filter:drop-shadow(0 1px 1px #0005)}
+.mic-pin svg{display:block;width:100%;height:100%;overflow:visible;pointer-events:none}
+.mic-pin .pin-shape{fill:currentColor;stroke:#fff;stroke-width:1.5;stroke-linejoin:round}
+.mic-pin circle,.mic-pin text{fill:#fff}.mic-pin text{font-family:Tahoma,Verdana,Arial,sans-serif;font-weight:bold}
+.mic-pin.mic-cluster .pin-shape{fill:#fff;stroke:currentColor;stroke-width:2}.mic-pin.mic-cluster text{fill:currentColor}
+.mic-pin:hover,.mic-pin:focus-visible{background:none;color:#123d70;z-index:5}.mic-pin:focus-visible{outline:2px solid #175ca8;outline-offset:3px;border-radius:5px}
 
 #cards .card-main{grid-template-columns:53px minmax(0,1fr) 40px}
 .filter-options input[type=time]{min-width:0;width:100%;padding:5px;font:12px var(--sans)}
@@ -298,7 +302,7 @@ class MicMap {
       else clusters.push({x,y,rows:[...rows]});
     }
     for(const {x,y,rows,grouped=false} of clusters){
-      const button=document.createElement('button');button.type='button';button.className='mic-pin'+(grouped?' mic-cluster':'');button.dataset.count=rows.length;button.textContent=rows.length>1?rows.length:'•';button.style.left=`${x}px`;button.style.top=`${y}px`;button.setAttribute('aria-label',grouped?`Zoom into ${rows.length} nearby mics`:`${rows.length} mic${rows.length===1?'':'s'} at ${rows[0].venue}`);button.title=grouped?'Nearby venues — click to zoom':rows[0].venue;button.addEventListener('click',()=>{if(grouped){this.center=this.unproject(x+left,y+top);this.zoom=Math.min(19,this.zoom+2);this.hide();this.draw();}else this.show(rows,x,y);});this.pins.append(button);
+      const button=document.createElement('button');button.type='button';button.className='mic-pin'+(grouped?' mic-cluster':'');button.dataset.count=rows.length;button.innerHTML=`<svg viewBox="0 0 28 36" aria-hidden="true" focusable="false"><path class="pin-shape" d="M14 1C6.8 1 1 6.8 1 14c0 9 13 21 13 21s13-12 13-21C27 6.8 21.2 1 14 1Z"/>${rows.length>1?`<text x="14" y="14" dy=".35em" text-anchor="middle" font-size="${rows.length>99?9:11}">${rows.length}</text>`:'<circle cx="14" cy="14" r="4"/>'}</svg>`;button.style.left=`${x}px`;button.style.top=`${y}px`;button.setAttribute('aria-label',grouped?`Zoom into ${rows.length} nearby mics`:`${rows.length} mic${rows.length===1?'':'s'} at ${rows[0].venue}`);button.title=grouped?'Nearby venues — click to zoom':rows[0].venue;button.addEventListener('click',()=>{if(grouped){this.center=this.unproject(x+left,y+top);this.zoom=Math.min(19,this.zoom+2);this.hide();this.draw();}else this.show(rows,x,y);});this.pins.append(button);
     }
   }
   show(rows,x,y,page=0){
