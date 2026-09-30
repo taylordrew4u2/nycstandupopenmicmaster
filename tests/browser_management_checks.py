@@ -19,6 +19,8 @@ def run():
         app=create_app(str(Path(tmp)/'test.db'))
         with TestClient(app,headers=H,base_url='https://mic.test') as admin, TestClient(app,base_url='https://mic.test') as visitor, sync_playwright() as pw:
             assert admin.post('/api/login',json={'password':password}).status_code==200
+            with TestClient(app,headers={**H,'User-Agent':'Mozilla/5.0'}) as reader:
+                assert reader.post('/api/visit').status_code==204
             browser=pw.chromium.launch(executable_path=os.getenv('CHROMIUM_PATH','/tmp/mic-chromium'),headless=True,args=['--no-sandbox','--disable-gpu'])
             page=browser.new_page(viewport={'width':390,'height':844})
             page.set_default_timeout(6000)
@@ -62,6 +64,8 @@ def run():
             page.get_by_role('button',name='Sign in',exact=False).click()
             page.wait_for_selector('[data-admin-tab="proposals"]')
             assert page.locator('[data-admin-tab]').count()==9
+            page.wait_for_selector('#visitor-stats .visitor-counts')
+            assert page.locator('.visitor-counts strong').all_text_contents()==['1','1','1','1']
             page.locator('[data-admin-tab="proposals"]').click()
             page.on('dialog',lambda d:d.accept('Verified with the venue.') if d.type=='prompt' else d.accept())
             page.get_by_role('button',name='Approve mic & host setup').click()

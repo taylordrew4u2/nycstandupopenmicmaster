@@ -6,7 +6,7 @@ root = Path(__file__).resolve().parents[1]
 public = root / 'assets'
 html = (public / 'index.html').read_text()
 html = html.replace('<link rel="stylesheet" href="/assets/styles.css">', '<style>' + (public / 'styles.css').read_text() + '</style>')
-for asset in ('map.js', 'app.js'):
+for asset in ('map.js', 'app.js', 'visitors.js'):
     html = html.replace(f'<script src="/assets/{asset}" defer></script>', '')
 icon = 'data:image/svg+xml,' + quote((public / 'favicon.svg').read_text())
 html = html.replace('/assets/favicon.svg', icon)
