@@ -292,3 +292,13 @@ Run `python scripts/build_preview.py`, then
 `CHROMIUM_PATH=/path/to/chromium python tests/browser_map_gestures.py` for real
 Chromium touch-input checks. The test mocks vibration calls; it cannot verify a
 physical phone's vibration motor.
+
+### Public domain
+
+The public domain is `https://nycopenmicmasterlist.com`. Canonical page URLs, About
+structured data, the sitemap and robots sitemap reference use this domain. Connect
+it directly in Vercel Domains (registrar URL forwarding is not a custom-domain
+connection). The production server explicitly accepts the custom origin during
+migration from its configured Vercel origin; unrelated origins remain blocked. Set production `PUBLIC_ORIGIN=https://nycopenmicmasterlist.com`
+and redeploy. Verify host/admin sign-in and mic submissions on the custom domain.
+The scheduled source checker continues using its existing direct deployment URL.

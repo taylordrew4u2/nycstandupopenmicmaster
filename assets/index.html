@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#245da7">
   <meta name="description" content="Find NYC stand up comedy open mics by day, time, and borough. Browse the map, venue details, host links, and listing updates.">
-  <link rel="canonical" href="https://nycstandupopenmicmaster.vercel.app/">
+  <link rel="canonical" href="https://nycopenmicmasterlist.com/">
+  <meta property="og:title" content="NYC Open Mic Master List">
+  <meta property="og:description" content="Find NYC comedy open mics by day, time, and borough. Map, host details, and visible updates.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://nycopenmicmasterlist.com/">
   <title>NYC Open Mic Master List</title>
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/styles.css">
@@ -20,7 +24,7 @@
 </div></header>
 <div id="preview-banner" class="preview-banner" hidden></div>
 <div class="status-strip" hidden><span id="directory-dot"></span><span id="directory-status"></span></div>
-<main id="main">
+<main id="main" tabindex="-1">
 <section id="view-directory">
   <section id="listings" class="directory-section" aria-label="Open-mic listings">
     <div class="directory-controls" role="search">
@@ -31,7 +35,7 @@
     </div>
     <div class="directory-layout">
       <section class="map-panel" aria-label="NYC open mic map">
-        <div id="nyc-map" class="city-map" role="region" aria-label="Interactive NYC map; select pins or use the zoom buttons">
+        <div id="nyc-map" class="city-map" role="region" aria-label="Interactive NYC map. Drag to pan, pinch or double tap to zoom, or use the zoom buttons">
           <div class="tile-plane"></div><div class="pin-plane"></div>
           <div class="map-controls"><button type="button" data-map="in" aria-label="Zoom in">+</button><button type="button" data-map="out" aria-label="Zoom out">−</button><button type="button" class="map-reset" data-action="map-reset" aria-label="Show all NYC" title="Show all NYC">NYC</button></div>
           <span class="map-offline" hidden>Map unavailable. Select a mic for its address.</span>
@@ -48,7 +52,7 @@
 </section>
 <section id="view-sources" class="wrap admin-section" hidden></section>
 </main>
-<dialog id="modal"><div id="modal-content"></div></dialog>
+<dialog id="modal" aria-labelledby="modal-title"><div id="modal-content"></div></dialog>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 </body>
 </html>
