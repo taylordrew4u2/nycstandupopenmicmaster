@@ -138,7 +138,7 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 #cards .mic-meta{display:flex;align-items:center;gap:4px}
 #cards .mic-meta .venue-line{flex:1;min-width:0;width:auto}
 #cards .mic-cost{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
-.site-menu{position:relative;flex:none}.site-menu summary{list-style:none;cursor:pointer;color:white;font-size:22px;line-height:26px;padding:0 5px}.site-menu summary::-webkit-details-marker{display:none}
+.site-menu{position:relative;flex:none}.site-menu summary{list-style:none;cursor:pointer;color:white;font-size:12px;line-height:26px;padding:0 7px}.site-menu summary::-webkit-details-marker{display:none}
 .site-menu nav{display:flex;flex-direction:column;align-items:stretch;gap:0;margin:0;position:absolute;right:0;top:calc(100% + 6px);width:145px;padding:3px;background:#f5f4ed;border:1px solid #8799ae;box-shadow:2px 3px 5px #0003;z-index:30}
 .site-menu nav a,.site-menu nav button{display:block;flex:none;white-space:nowrap;width:100%;border:0;background:none;text-align:left;padding:8px;color:#20334a;font:12px var(--sans)}
 .site-menu nav a:hover,.site-menu nav button:hover{background:#dce9f8}.donation-options{display:flex;gap:10px;margin:16px 0}
@@ -213,8 +213,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 <body>
 <a class="skip-link" href="#main">Skip to mics</a>
 <header class="topbar"><div class="nav-inner">
-  <div class="site-heading"><a href="/" class="wordmark" aria-label="NYC Open Mic Master List home"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20128%20128%22%3E%0A%3Ctitle%3ENYC%20Open%20Mic%20Master%20List%20map%20pin%20and%20microphone%3C/title%3E%0A%3Cpath%20fill%3D%22%232564B3%22%20d%3D%22M64%208C38%208%2020%2027%2020%2051c0%2030%2027%2055%2044%2073%2017-18%2044-43%2044-73C108%2027%2090%208%2064%208Z%22/%3E%0A%3Ccircle%20fill%3D%22%23FFFFFF%22%20cx%3D%2264%22%20cy%3D%2251%22%20r%3D%2220%22/%3E%0A%3Cpath%20fill%3D%22%23163A66%22%20d%3D%22M60%2038h8v20h-8zM53%2054h4c0%205%203%208%207%208s7-3%207-8h4c0%207-4%2012-9%2013v6h-4v-6c-5-1-9-6-9-13Z%22/%3E%0A%3C/svg%3E%0A" alt="" width="20" height="20"><span>NYC Open Mic Master List</span></a><span id="last-sync" class="last-sync" role="status">LAST SYNC AT —</span></div>
-  <details class="site-menu" id="site-menu"><summary aria-label="Open menu"><span aria-hidden="true">☰</span></summary><nav aria-label="Site menu"><a href="/owner">Host sign in</a><a href="/submit">Submit a mic</a><a href="/about">About</a><button data-action="donate">Donate</button></nav></details>
+  <div class="site-heading"><a href="/" class="wordmark" aria-label="NYC Open Mic Master List home"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20128%20128%22%3E%0A%3Ctitle%3ENYC%20Open%20Mic%20Master%20List%20map%20pin%20and%20microphone%3C/title%3E%0A%3Cpath%20fill%3D%22%232564B3%22%20d%3D%22M64%208C38%208%2020%2027%2020%2051c0%2030%2027%2055%2044%2073%2017-18%2044-43%2044-73C108%2027%2090%208%2064%208Z%22/%3E%0A%3Ccircle%20fill%3D%22%23FFFFFF%22%20cx%3D%2264%22%20cy%3D%2251%22%20r%3D%2220%22/%3E%0A%3Cpath%20fill%3D%22%23163A66%22%20d%3D%22M60%2038h8v20h-8zM53%2054h4c0%205%203%208%207%208s7-3%207-8h4c0%207-4%2012-9%2013v6h-4v-6c-5-1-9-6-9-13Z%22/%3E%0A%3C/svg%3E%0A" alt="" width="20" height="20"></a><span id="last-sync" class="last-sync" role="status">LAST SYNC AT —</span></div>
+  <details class="site-menu" id="site-menu"><summary>Menu</summary><nav aria-label="Site menu"><a href="/owner">Host sign in</a><a href="/submit">Submit a mic</a><a href="/about">About</a><button data-action="donate">Donate</button></nav></details>
 </div></header>
 <div id="preview-banner" class="preview-banner" hidden></div>
 <div class="status-strip" hidden><span id="directory-dot"></span><span id="directory-status"></span></div>
