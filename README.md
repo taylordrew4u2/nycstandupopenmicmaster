@@ -275,3 +275,20 @@ event titles explicitly containing “open mic”, and uses actual dated occurre
 venue coordinates. It does not assume weekly recurrence or infer performer fees.
 Only exact address/date/time matches join generic directory entries. Secret Pour's
 embedded private calendar is not connected.
+
+### Mobile map gestures
+
+The map supports one-finger dragging, two-finger pinch/pan, double-tap zoom, and
+existing zoom controls. Pinch zoom stays anchored between the fingers and uses
+integer OSM tile requests with fractional visual scaling. Dragging from a pin does
+not open it accidentally. Touch updates render at most once per animation frame.
+
+Coarse-pointer devices receive a brief vibration for map button actions and completed
+pinch zooms when `navigator.vibrate` is available. Unsupported browsers continue
+without vibration; reduced-motion preferences disable these pulses. Physical haptics
+depend on browser, hardware and device settings. No iOS vibration workaround is used.
+
+Run `python scripts/build_preview.py`, then
+`CHROMIUM_PATH=/path/to/chromium python tests/browser_map_gestures.py` for real
+Chromium touch-input checks. The test mocks vibration calls; it cannot verify a
+physical phone's vibration motor.
