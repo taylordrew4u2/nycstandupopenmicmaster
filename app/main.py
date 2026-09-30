@@ -137,7 +137,7 @@ def create_app(db_path=None):
         })
         if request.url.path.startswith('/api/'):
             response.headers['Cache-Control'] = 'no-store'
-        if request.url.path in ('/admin', '/owner', '/claim'):
+        if request.url.path in ('/admin', '/owner', '/claim', '/submit'):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['X-Robots-Tag'] = 'noindex, nofollow'
         return response
@@ -201,6 +201,10 @@ def create_app(db_path=None):
         from .scheduling import authorize, run_due
         await asyncio.to_thread(authorize, request.headers.get('authorization', ''))
         return await run_due(store, sync_one)
+
+    @app.get('/api/sync-status')
+    async def sync_status():
+        return {'last_sync_at': store.last_live_sync(), 'timezone': 'America/New_York'}
 
     @app.get('/api/public')
     async def public():
@@ -321,9 +325,24 @@ def create_app(db_path=None):
     from .community import register
     register(app, store, admin, local_dev)
 
+    @app.get('/api/admin/about', dependencies=[Depends(admin)])
+    async def about_settings():
+        from .about import read_content
+        return read_content(store).model_dump()
+
+    from .about import AboutContent
+
+    @app.put('/api/admin/about', dependencies=[Depends(admin)])
+    async def update_about(body: AboutContent):
+        from .about import save_content
+        save_content(store, body)
+        return {'ok': True}
+
     @app.get('/about')
     async def about():
-        return FileResponse(ROOT / 'assets' / 'about.html')
+        from .about import render
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(render(store), headers={'Cache-Control': 'no-store'})
 
     @app.get('/robots.txt')
     async def robots():
@@ -336,6 +355,7 @@ def create_app(db_path=None):
     @app.get('/admin')
     @app.get('/owner')
     @app.get('/claim')
+    @app.get('/submit')
     @app.get('/')
     async def index(request: Request):
         headers = {'X-Robots-Tag': 'noindex, nofollow'} if request.url.path != '/' else {}

@@ -42,7 +42,7 @@ with sync_playwright() as p:
         page.locator('#site-menu summary').click()
         assert page.locator('#site-menu nav').evaluate('''el => {
             const items=[...el.children].map(e=>e.getBoundingClientRect());
-            return items.length===3 && items.every((r,i)=>r.left>=0 && r.right<=innerWidth && r.bottom<=innerHeight && r.height<40 && (!i || r.top>=items[i-1].bottom));
+            return items.length===4 && items.every((r,i)=>r.left>=0 && r.right<=innerWidth && r.bottom<=innerHeight && r.height<40 && (!i || r.top>=items[i-1].bottom));
         }'''), (width,height,'menu items must stack and fit')
         page.locator('#site-menu summary').click()
         page.locator('.mic-title').first.click()
@@ -104,7 +104,7 @@ with sync_playwright() as p:
     assert page.get_by_role('link',name='Host sign in',exact=True).is_visible()
     assert page.get_by_role('link',name='About',exact=True).get_attribute('href')=='/about'
     page.locator('#site-menu summary').click()
-    # Nearby venues may cluster at city scale, but never shift venue dots at street scale.
+    # Nearby venues may cluster at city scale, but anchor each pin tip at the venue at street scale.
     page.evaluate("""() => {
       const base=state.data.listings[0];
       map.rows=[{...base,id:'pin-a',latitude:40.72,longitude:-73.99},
@@ -121,7 +121,7 @@ with sync_playwright() as p:
       return [...map.pins.querySelectorAll('.mic-pin')].map((pin,i)=>{
         const r=pin.getBoundingClientRect(),[x,y]=map.project(map.rows[i].latitude,map.rows[i].longitude);
         return Math.hypot((r.left+r.right)/2-bounds.left-map.root.clientLeft-(x-cx+map.root.clientWidth/2),
-                          (r.top+r.bottom)/2-bounds.top-map.root.clientTop-(y-cy+map.root.clientHeight/2));
+                          (r.bottom-1)-bounds.top-map.root.clientTop-(y-cy+map.root.clientHeight/2));
       });
     }""")
     assert max(offsets)<1, offsets

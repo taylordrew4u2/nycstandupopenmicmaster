@@ -15,13 +15,20 @@ from datetime import datetime
 from fastapi import Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, ConfigDict
 from .models import SourceConfig
-from .parsers import normalize_rows, DAYS, FIELDS
+from .parsers import normalize_rows, DAYS, FIELDS, key
 
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS submissions (
  id TEXT PRIMARY KEY, mic_id TEXT NOT NULL, mic_name TEXT NOT NULL,
  kind TEXT NOT NULL, name TEXT NOT NULL, email TEXT NOT NULL, message TEXT NOT NULL,
  state TEXT NOT NULL DEFAULT 'pending', created REAL NOT NULL, reviewed REAL, note TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS mic_proposals (
+ id TEXT PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
+ email TEXT NOT NULL, message TEXT NOT NULL, payload TEXT NOT NULL,
+ fingerprint TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending',
+ created REAL NOT NULL, reviewed REAL, reply TEXT NOT NULL DEFAULT '',
+ mic_id TEXT, claim_id TEXT
 );
 CREATE TABLE IF NOT EXISTS owners (
  id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
@@ -59,14 +66,27 @@ CREATE TABLE IF NOT EXISTS locations (
 
 class Submission(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    kind: str = Field(pattern=r'^(fix|claim)$')
+    kind: str = Field(pattern=r'^(fix|claim|report)$')
     name: str = Field(min_length=2, max_length=100)
     email: str = Field(default='', max_length=254)
     message: str = Field(min_length=10, max_length=3000)
     website: str = Field(default='', max_length=300)  # Honeypot, not a genuine data field.
 
+class MicProposal(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    name: str = Field(min_length=2, max_length=100)
+    email: str = Field(min_length=3, max_length=254)
+    message: str = Field(min_length=10, max_length=3000)
+    fields: dict
+    website: str = Field(default='', max_length=300)
+
+class ProposalDecision(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    action: str = Field(pattern=r'^(approve|reject)$')
+    reply: str = Field(default='', max_length=1000)
+
 class Decision(BaseModel):
-    action: str = Field(pattern=r'^(approve|reject|resolve)$')
+    action: str = Field(pattern=r'^(approve|reject|resolve|hide)$')
     note: str = Field(default='', max_length=1000)
 
 class Redeem(BaseModel):
@@ -207,6 +227,100 @@ def register(app, store, admin, local_dev):
             record(c,mic_id,actor,'edit',json.dumps({'before':{k:before.get(k) for k in patch},'after':patch}))
         return {'ok': True}
 
+    def proposal_fingerprint(payload):
+        values = [key(payload.get(k, '')) for k in ('name', 'venue', 'borough')]
+        values += [str(payload.get('weekday')), payload.get('start_time', '')]
+        return token_hash(json.dumps(values))
+
+    @app.post('/api/mic-proposals', status_code=201)
+    async def propose_mic(body: MicProposal, request: Request):
+        throttle(request, 'mic-proposals', 5, 3600)
+        if body.website:
+            raise HTTPException(400, 'Unable to submit this form.')
+        email = email_value(body.email)
+        if len(body.name.strip()) < 2 or len(body.message.strip()) < 10:
+            raise HTTPException(400, 'Include your name and how we can verify that you run this mic.')
+        allowed = {'name', 'venue', 'address', 'borough', 'weekday', 'date', 'start_time', 'cost'}
+        if set(body.fields) - allowed:
+            raise HTTPException(400, 'Unsupported mic submission fields.')
+        if not str(body.fields.get('address', '')).strip():
+            raise HTTPException(400, 'A street address is required.')
+        payload = normalize_edit({}, body.fields)
+        fingerprint = proposal_fingerprint(payload)
+        raw = secrets.token_urlsafe(40)
+        proposal_id = uuid.uuid4().hex
+        with store.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
+            if c.execute("SELECT 1 FROM mic_proposals WHERE email=? AND fingerprint=? AND state='pending'", (email, fingerprint)).fetchone():
+                raise HTTPException(409, 'This mic is already awaiting review. Use the private status link from your first submission.')
+            c.execute('INSERT INTO mic_proposals(id,token_hash,name,email,message,payload,fingerprint,created) VALUES (?,?,?,?,?,?,?,?)',
+                      (proposal_id, token_hash(raw), body.name.strip(), email, body.message.strip(), json.dumps(payload), fingerprint, time.time()))
+        return {'ok': True, 'status_path': '/submit#' + raw,
+                'message': 'Submitted for review. Save your private status link; it shows the decision and unlocks host setup if approved. No email has been sent.'}
+
+    @app.post('/api/mic-proposals/status')
+    async def proposal_status(body: InvitationLookup, request: Request):
+        throttle(request, 'proposal-status', 150)
+        with store.connect() as c:
+            row = c.execute('SELECT * FROM mic_proposals WHERE token_hash=?', (token_hash(body.token),)).fetchone()
+            if not row:
+                raise HTTPException(404, 'This private status link is invalid.')
+            state = row['state']
+            setup = False
+            expires = None
+            if row['claim_id']:
+                claim = c.execute('SELECT state FROM submissions WHERE id=?', (row['claim_id'],)).fetchone()
+                if not claim or claim['state'] in ('rejected', 'revoked'):
+                    state = 'revoked'
+                elif claim['state'] == 'activated':
+                    state = 'activated'
+                elif claim['state'] == 'approved':
+                    invite = c.execute('SELECT expires FROM invitations WHERE token_hash=? AND submission_id=? AND used IS NULL AND expires>?',
+                                       (row['token_hash'], row['claim_id'], time.time())).fetchone()
+                    setup = bool(invite)
+                    expires = invite['expires'] if invite else None
+            return {'state': state, 'mic_name': json.loads(row['payload'])['name'], 'reply': row['reply'],
+                    'created': row['created'], 'reviewed': row['reviewed'], 'mic_id': row['mic_id'],
+                    'can_setup': setup, 'expires_at': expires}
+
+    @app.post('/api/admin/mic-proposals/{proposal_id}', dependencies=[Depends(admin)])
+    async def review_proposal(proposal_id: str, body: ProposalDecision):
+        now = time.time()
+        with store.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
+            row = c.execute('SELECT * FROM mic_proposals WHERE id=?', (proposal_id,)).fetchone()
+            if not row:
+                raise HTTPException(404, 'Submission not found.')
+            if row['state'] != 'pending':
+                raise HTTPException(409, 'This submission has already been reviewed.')
+            if body.action == 'reject':
+                c.execute("UPDATE mic_proposals SET state='rejected',reviewed=?,reply=? WHERE id=?", (now, body.reply, proposal_id))
+                record(c, None, 'admin', 'mic-submission-rejected', proposal_id)
+                return {'ok': True, 'message': 'The decision is now visible on the submitter’s private status page. No email was sent.'}
+            payload = json.loads(row['payload'])
+            for observation in c.execute('SELECT payload FROM observations WHERE hidden=0 AND missing_count=0'):
+                if proposal_fingerprint(json.loads(observation['payload'])) == row['fingerprint']:
+                    raise HTTPException(409, 'This mic appears to be listed already. Reject this submission and ask the host to claim the existing listing instead.')
+            mic_id, remote_key, claim_id = uuid.uuid4().hex, uuid.uuid4().hex, uuid.uuid4().hex
+            payload['external_id'] = remote_key
+            payload['remote_key'] = remote_key
+            config = SourceConfig(name='Manually added', kind='upload', permission_confirmed=True, priority=100).model_dump()
+            c.execute("INSERT INTO sources(id,config,enabled,state,created,next_check,last_success) VALUES ('manual',?,0,'snapshot',?,?,?) ON CONFLICT(id) DO NOTHING", (json.dumps(config), now, now, now))
+            store._apply(c, 'manual', [payload], now, mark_missing=False)
+            c.execute('INSERT INTO mic_registry VALUES (?,?,?)', ('manual', remote_key, mic_id))
+            c.execute("INSERT INTO submissions(id,mic_id,mic_name,kind,name,email,message,state,created,reviewed) VALUES (?,?,?,'claim',?,?,?,'approved',?,?)",
+                      (claim_id, mic_id, payload['name'], row['name'], row['email'], row['message'], row['created'], now))
+            # The private status capability becomes usable for approved setup.
+            # Only its hash is stored. A second one-use link can be shared by admin.
+            raw = secrets.token_urlsafe(40)
+            for hashed in (row['token_hash'], token_hash(raw)):
+                c.execute('INSERT INTO invitations VALUES (?,?,?,NULL)', (hashed, claim_id, now + 7*86400))
+            c.execute("UPDATE mic_proposals SET state='approved',reviewed=?,reply=?,mic_id=?,claim_id=? WHERE id=?",
+                      (now, body.reply, mic_id, claim_id, proposal_id))
+            record(c, mic_id, 'admin', 'mic-submission-approved', proposal_id)
+            return {'ok': True, 'mic_id': mic_id, 'email': row['email'], 'invite_path': '/claim#' + raw,
+                    'message': 'Published. The submitter’s private status page now offers host setup. No email was sent.'}
+
     @app.post('/api/mics/{mic_id}/submissions', status_code=201)
     async def submit(mic_id: str, body: Submission, request: Request):
         throttle(request,'submissions',6,3600)
@@ -231,9 +345,10 @@ def register(app, store, admin, local_dev):
     async def queue():
         with store.connect() as c:
             submissions=[dict(r) for r in c.execute('SELECT * FROM submissions ORDER BY created DESC LIMIT 1000')]
+            proposals=[{**{k:r[k] for k in ('id','name','email','message','state','created','reviewed','reply','mic_id','claim_id')},'listing':json.loads(r['payload'])} for r in c.execute('SELECT * FROM mic_proposals ORDER BY created DESC LIMIT 1000')]
             ownership=[dict(r) for r in c.execute('SELECT m.*,o.email,o.name FROM ownership m JOIN owners o ON o.id=m.owner_id')]
             audit=[dict(r) for r in c.execute('SELECT * FROM audit ORDER BY created DESC LIMIT 150')]
-        return {'submissions':submissions,'ownership':ownership,'audit':audit,'listings':store.public_data(include_hidden=True)['listings']}
+        return {'proposals':proposals,'submissions':submissions,'ownership':ownership,'audit':audit,'listings':store.public_data(include_hidden=True)['listings']}
 
     @app.post('/api/admin/submissions/{submission_id}', dependencies=[Depends(admin)])
     async def decide(submission_id: str, body: Decision):
@@ -258,6 +373,13 @@ def register(app, store, admin, local_dev):
                 record(c,row['mic_id'],'admin','claim-approved',submission_id)
                 return {'ok':True,'invite_path':'/claim#'+raw,'email':row['email'],'expires_at':now+7*86400,
                         'message':'Copy and send this one-use signup link to the verified host. It has not been emailed.'}
+            if body.action == 'hide':
+                if row['kind'] != 'report':
+                    raise HTTPException(400, 'Only an inactive-mic report can be resolved by hiding the mic.')
+                c.execute('INSERT INTO mic_flags VALUES (?,1) ON CONFLICT(mic_id) DO UPDATE SET hidden=1', (row['mic_id'],))
+                record(c, row['mic_id'], 'admin', 'hidden-after-report', submission_id)
+            if row['kind'] == 'report' and body.action == 'approve':
+                raise HTTPException(400, 'Hide the inactive mic or dismiss its report.')
             if row['kind']=='claim' and body.action=='resolve':
                 raise HTTPException(400,'Approve or reject a claim.')
             if row['kind']=='fix' and body.action=='approve':

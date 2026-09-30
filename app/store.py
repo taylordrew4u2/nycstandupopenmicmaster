@@ -277,6 +277,11 @@ class Store:
                       ('review' if review else 'error', message[:2000], now + delay, source_id))
             self._run(c, source_id, 'review' if review else 'error', message=message)
 
+    def last_live_sync(self, sources=None):
+        sources = self.list_sources() if sources is None else sources
+        return max((s['last_success'] for s in sources if s['config'].get('url')
+                    and s['config']['kind'] != 'upload' and s['last_success']), default=None)
+
     def public_data(self, include_hidden=False):
         now = time.time()
         sources = {s['id']: s for s in self.list_sources()}
@@ -284,6 +289,7 @@ class Store:
             observations = c.execute('SELECT * FROM observations WHERE hidden=0').fetchall()
         from .badslava import supports as badslava_source
         from .comediq import supports as comediq_source
+        from .bushwick import supports as bushwick_source
         calendar_slots = defaultdict(set)
         for o in observations:
             source = sources.get(o['source_id'])
@@ -301,7 +307,8 @@ class Store:
             schedule = payload['date'] or f"weekly:{payload['weekday']}"
             name, venue = payload['name'], payload['venue']
             unmatched_slot = None
-            if comediq_source(source['config']['url']):
+            venue_calendar = bushwick_source(source['config']['url'])
+            if comediq_source(source['config']['url']) or venue_calendar:
                 matches = calendar_slots.get(venue_slot(payload), set())
                 if len(matches) == 1:
                     name, venue = next(iter(matches))
@@ -309,7 +316,7 @@ class Store:
                     unmatched_slot = digest(venue_slot(payload))[:16]
             identity = f"{key(name)}|{key(venue)}|{key(payload['borough'])}|{schedule}"
             if unmatched_slot:
-                identity += '|comediq:' + unmatched_slot
+                identity += ('|bushwick:' if venue_calendar else '|comediq:') + unmatched_slot
             grouped[identity].append((dict(o), payload, source))
         final_groups = {}
         for identity, items in grouped.items():
@@ -412,6 +419,7 @@ class Store:
                              'checked_at': observation['last_seen'], 'updated_at': observation['updated'],
                              'conflicts': conflicts, 'stale': bool(stale), 'host_confirmed_at': host_confirmed})
         return {'listings': listings, 'source_count': len(sources), 'last_check': max((s['last_success'] or 0 for s in sources.values()), default=None),
+                'last_sync_at': self.last_live_sync(sources.values()),
                 'timezone': 'America/New_York', 'mode': 'live' if sources else 'empty'}
 
     def _inherit_recurring_ownership(self, c, members):
