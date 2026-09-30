@@ -241,30 +241,81 @@ class MicMap {
       if (e.target.closest('button,a,.map-popup') || e.button !== 0) return;
       e.preventDefault();
       if (this.zoom >= 19) return;
-      const bounds=root.getBoundingClientRect();
-      const dx=e.clientX-bounds.left-root.clientLeft-root.clientWidth/2;
-      const dy=e.clientY-bounds.top-root.clientTop-root.clientHeight/2;
-      const [cx,cy]=this.project(...this.center);
-      this.zoom++;
-      this.center=this.unproject((cx+dx)*2-dx,(cy+dy)*2-dy);
-      this.hide(); this.draw();
+      if(performance.now()<(this.suppressDoubleUntil||0))return;
+      this.zoomAt(this.zoom+1,e.clientX,e.clientY);this.haptic();
     });
-    let drag = null;
+    this.pointers = new Map(); this.gesture = null; this.suppressClickUntil = 0;
+    // A drag/pinch ending over a pin must not accidentally select that mic.
+    root.addEventListener('click', e => {
+      if (performance.now() < this.suppressClickUntil) { e.preventDefault(); e.stopImmediatePropagation(); }
+      else if (e.target.closest('button')) this.haptic();
+    }, true);
+    const blocked = e => e.target.closest('a,.map-popup,.map-controls');
     root.addEventListener('pointerdown', e => {
-      if (e.target.closest('button,a,.map-popup') || e.button !== 0) return;
-      drag = {x:e.clientX,y:e.clientY,center:this.project(...this.center),moved:false};
-      root.setPointerCapture(e.pointerId);
+      if (blocked(e) || e.button !== 0) return;
+      this.pointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+      if (!e.target.closest('.mic-pin')) root.setPointerCapture(e.pointerId);
+      this.beginGesture();
+      if (this.pointers.size > 1) {
+        this.lastTap = null; this.suppressClickUntil = performance.now()+500;
+        for (const id of this.pointers.keys()) { try { root.setPointerCapture(id); } catch {} }
+      }
     });
     root.addEventListener('pointermove', e => {
-      if (!drag) return;
-      const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
-      if (Math.abs(dx)+Math.abs(dy)>4) drag.moved=true;
-      this.center=this.unproject(drag.center[0]-dx,drag.center[1]-dy); this.hide(); this.draw();
+      if (!this.pointers.has(e.pointerId) || !this.gesture) return;
+      this.pointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+      const points=[...this.pointers.values()].slice(0,2), g=this.gesture;
+      const mid=this.midpoint(points), distance=points.length===2?Math.hypot(points[1].x-points[0].x,points[1].y-points[0].y):0;
+      if (!g.moved && Math.hypot(mid.x-g.mid.x,mid.y-g.mid.y)<4 && Math.abs(distance-g.distance)<4) return;
+      g.moved=true; this.lastTap=null; this.suppressClickUntil=performance.now()+500;
+      try { root.setPointerCapture(e.pointerId); } catch {}
+      if (points.length===2 && g.distance>0) this.zoom=Math.max(8,Math.min(19,g.zoom+Math.log2(Math.max(1,distance)/g.distance)));
+      const bounds=root.getBoundingClientRect(),[x,y]=this.project(...g.anchor);
+      this.center=this.unproject(x-(mid.x-bounds.left-root.clientLeft-root.clientWidth/2),y-(mid.y-bounds.top-root.clientTop-root.clientHeight/2));
+      this.hide(); this.scheduleDraw();
     });
-    root.addEventListener('pointerup', () => {drag=null;});
-    root.addEventListener('pointercancel', () => {drag=null;});
+    const finish = e => {
+      if (!this.pointers.has(e.pointerId)) return;
+      const g=this.gesture, multi=this.pointers.size>1;
+      if(e.type!=='pointerup')this.lastTap=null;
+      this.pointers.delete(e.pointerId);
+      if (g?.moved || multi) {
+        this.suppressClickUntil=performance.now()+500;
+        if (multi && e.type==='pointerup' && Math.abs(this.zoom-g.zoom)>.1) this.haptic();
+      } else if (e.type==='pointerup' && e.pointerType==='touch' && performance.now()>=this.suppressClickUntil && !e.target.closest('button')) {
+        const now=performance.now(), previous=this.lastTap;
+        if (previous && now-previous.time<320 && Math.hypot(e.clientX-previous.x,e.clientY-previous.y)<24) {
+          this.zoomAt(this.zoom+1,e.clientX,e.clientY);this.haptic();this.lastTap=null;
+          this.suppressDoubleUntil=now+500;
+        } else this.lastTap={time:now,x:e.clientX,y:e.clientY};
+      }
+      this.beginGesture();
+      if (!this.pointers.size && this.frame) { cancelAnimationFrame(this.frame);this.frame=null;this.draw(); }
+    };
+    root.addEventListener('pointerup',finish);
+    root.addEventListener('pointercancel',finish);
+    root.addEventListener('lostpointercapture',e=>{if(e.target===root)finish(e);});
     this.observer=new ResizeObserver(()=>{this.hide();this.draw();}); this.observer.observe(root);
     this.draw();
+  }
+  haptic(){
+    if(!matchMedia('(pointer: coarse)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    if(typeof navigator.vibrate==='function'){try{navigator.vibrate(10);}catch{}}
+  }
+  midpoint(points){return points.length>1?{x:(points[0].x+points[1].x)/2,y:(points[0].y+points[1].y)/2}:points[0];}
+  beginGesture(){
+    const points=[...this.pointers.values()].slice(0,2);
+    if(!points.length){this.gesture=null;return;}
+    const mid=this.midpoint(points),bounds=this.root.getBoundingClientRect(),[cx,cy]=this.project(...this.center);
+    this.gesture={mid,zoom:this.zoom,moved:false,distance:points.length===2?Math.hypot(points[1].x-points[0].x,points[1].y-points[0].y):0,
+      anchor:this.unproject(cx+mid.x-bounds.left-this.root.clientLeft-this.root.clientWidth/2,cy+mid.y-bounds.top-this.root.clientTop-this.root.clientHeight/2)};
+  }
+  scheduleDraw(){if(!this.frame)this.frame=requestAnimationFrame(()=>{this.frame=null;this.draw();});}
+  zoomAt(zoom,clientX,clientY){
+    const bounds=this.root.getBoundingClientRect(),dx=clientX-bounds.left-this.root.clientLeft-this.root.clientWidth/2,dy=clientY-bounds.top-this.root.clientTop-this.root.clientHeight/2;
+    const [cx,cy]=this.project(...this.center),anchor=this.unproject(cx+dx,cy+dy);
+    this.zoom=Math.max(8,Math.min(19,zoom));const [x,y]=this.project(...anchor);
+    this.center=this.unproject(x-dx,y-dy);this.hide();this.draw();
   }
   project(lat,lng) {const size=256*2**this.zoom,s=Math.sin(Math.max(-85,Math.min(85,lat))*Math.PI/180);return [(lng+180)/360*size,(.5-Math.log((1+s)/(1-s))/(4*Math.PI))*size];}
   unproject(x,y) {const size=256*2**this.zoom;return [180/Math.PI*Math.atan(Math.sinh(Math.PI*(1-2*y/size))),x/size*360-180];}
@@ -288,12 +339,13 @@ class MicMap {
     const w=this.root.clientWidth,h=this.root.clientHeight;if(!w||!h)return;
     if(!this.initialFit)this.fitCity();
     const [cx,cy]=this.project(...this.center),left=cx-w/2,top=cy-h/2;
-    const minX=Math.floor(left/256),minY=Math.floor(top/256),maxX=Math.floor((left+w)/256),maxY=Math.floor((top+h)/256),keep=new Set();
+    const tileZoom=Math.floor(this.zoom),scale=2**(this.zoom-tileZoom),tileSize=256*scale;
+    const minX=Math.floor(left/tileSize),minY=Math.floor(top/tileSize),maxX=Math.floor((left+w)/tileSize),maxY=Math.floor((top+h)/tileSize),keep=new Set();
     for(let x=minX;x<=maxX;x++)for(let y=minY;y<=maxY;y++){
-      if(y<0||y>=2**this.zoom)continue;
-      const id=`${this.zoom}/${x}/${y}`;keep.add(id);let tile=this.tiles.get(id);
+      if(y<0||y>=2**tileZoom)continue;
+      const id=`${tileZoom}/${((x % 2**tileZoom)+2**tileZoom)%2**tileZoom}/${y}`;keep.add(id);let tile=this.tiles.get(id);
       if(!tile){tile=new Image();tile.alt='';tile.draggable=false;tile.referrerPolicy='strict-origin-when-cross-origin';tile.className='map-tile';tile.onload=()=>{tile.style.visibility='visible';this.loaded++;this.root.querySelector('.map-offline').hidden=true;};tile.onerror=()=>{tile.style.visibility='hidden';this.failed++;if(this.loaded===0)this.root.querySelector('.map-offline').hidden=false;};tile.src=`https://tile.openstreetmap.org/${id}.png`;this.tiles.set(id,tile);this.plane.append(tile);}
-      tile.style.transform=`translate(${Math.round(x*256-left)}px,${Math.round(y*256-top)}px)`;
+      tile.style.transformOrigin='0 0';tile.style.transform=`translate(${x*tileSize-left}px,${y*tileSize-top}px) scale(${scale})`;
     }
     for(const [id,tile]of this.tiles)if(!keep.has(id)){tile.remove();this.tiles.delete(id);}
     this.pins.replaceChildren();
