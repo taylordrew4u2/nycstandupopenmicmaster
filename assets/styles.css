@@ -107,9 +107,13 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 .claim-status.is-claimed{color:#245d32;border-color:#a9c5af;background:#e9f4eb}
 .popup-mic .claim-status{font:9px/13px var(--sans);margin-left:4px}
 
-/* The center of a venue dot is its coordinate, not the top of an offset pin. */
-.mic-pin{width:24px;height:24px;border-radius:50%;transform:translate(-50%,-50%);padding:0}
-.mic-pin.mic-cluster{width:30px;height:30px;background:#fff;color:#245da7;border:2px dashed #245da7;font-weight:bold}
+/* Pointed markers: the tip stays anchored to the mapped coordinate. */
+.mic-pin,.mic-pin.mic-cluster{width:28px;height:36px;transform:translate(-50%,calc(-100% + 1px));padding:0;border:0;border-radius:0;background:none;color:#245da7;box-shadow:none;filter:drop-shadow(0 1px 1px #0005)}
+.mic-pin svg{display:block;width:100%;height:100%;overflow:visible;pointer-events:none}
+.mic-pin .pin-shape{fill:currentColor;stroke:#fff;stroke-width:1.5;stroke-linejoin:round}
+.mic-pin circle,.mic-pin text{fill:#fff}.mic-pin text{font-family:Tahoma,Verdana,Arial,sans-serif;font-weight:bold}
+.mic-pin.mic-cluster .pin-shape{fill:#fff;stroke:currentColor;stroke-width:2}.mic-pin.mic-cluster text{fill:currentColor}
+.mic-pin:hover,.mic-pin:focus-visible{background:none;color:#123d70;z-index:5}.mic-pin:focus-visible{outline:2px solid #175ca8;outline-offset:3px;border-radius:5px}
 
 #cards .card-main{grid-template-columns:53px minmax(0,1fr) 40px}
 .filter-options input[type=time]{min-width:0;width:100%;padding:5px;font:12px var(--sans)}
