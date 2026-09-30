@@ -223,6 +223,7 @@ def create_app(db_path=None):
         with store.connect() as c:
             hb = c.execute("SELECT value FROM meta WHERE key='worker_heartbeat'").fetchone()
         return {'sources': store.list_sources(), 'activity': store.activity(), 'review': store.review_rows(),
+                'club_candidates': json.loads((Path(__file__).parent / 'club_catalog.json').read_text()),
                 'scheduler_enabled': scheduler_enabled, 'heartbeat_max_age': 240 if background_worker else 2700,
                 'heartbeat': float(hb[0]) if hb else None}
 

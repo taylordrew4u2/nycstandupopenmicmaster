@@ -36,6 +36,8 @@ ALIASES = {
     'neighborhood': ['neighborhood', 'neighbourhood', 'area'],
     'weekday': ['day', 'weekday', 'day of week', 'days', 'recurs'],
     'date': ['date', 'event date'],
+    'frequency': ['frequency', 'recurrence'],
+    'recurrence_anchor': ['recurrence anchor', 'confirmed biweekly date'],
     'start_time': ['start time', 'time', 'starts', 'show time', 'mic time'],
     'signup_time': ['signup time', 'sign up time', 'registration time'],
     'signup_url': ['signup url', 'signup link', 'sign up link', 'registration', 'tickets', 'url', 'link'],
@@ -271,6 +273,14 @@ def normalize_rows(raw_rows, config):
             minutes = int(minutes_match[1]) if minutes_match else None
             if minutes is not None and not 1 <= minutes <= 90:
                 minutes = None
+            frequency = clean(mapped['frequency']).lower()
+            if frequency not in ('', 'weekly', 'biweekly'):
+                raise ValueError('frequency must be weekly or biweekly')
+            anchor = parse_date(mapped['recurrence_anchor'])
+            if anchor and frequency != 'biweekly':
+                raise ValueError('a recurrence anchor requires biweekly frequency')
+            if anchor and not event_date and datetime.fromisoformat(anchor).weekday() not in days:
+                raise ValueError('confirmed biweekly date must match the selected weekday')
             exceptions = [parse_date(x.strip()) for x in clean(mapped['excluded_dates']).split(',') if x.strip()]
             status = clean(mapped['status']).lower()
             if status not in ('', 'scheduled', 'active', 'cancelled', 'canceled', 'postponed'):
@@ -303,7 +313,7 @@ def normalize_rows(raw_rows, config):
                     'cost': cost, 'cost_text': cost_text[:100], 'purchase_minimum': clean(mapped['purchase_minimum'])[:150],
                     'set_minutes': minutes, 'notes': clean(mapped['notes'])[:2000],
                     'status': 'cancelled' if status in ('cancelled', 'canceled') else ('scheduled' if status in ('','active') else status),
-                    'excluded_dates': exceptions,
+                    'excluded_dates': exceptions, 'frequency': frequency, 'recurrence_anchor': anchor,
                 })
         except (ValueError, TypeError) as exc:
             skipped += 1
@@ -359,6 +369,10 @@ def extract(content: bytes, config: SourceConfig, content_type='', filename=''):
         if kind == 'auto' and bushwick_source(config.url):
             raw = bushwick_rows(soup, config.url)
             kind = 'bushwick'
+        from .club_sources import source_kind, calendar_rows as club_rows
+        if kind == 'auto' and source_kind(config.url):
+            raw = club_rows(soup, config.url)
+            kind = 'official_club'
         if kind in ('auto', 'jsonld'):
             raw = parse_jsonld(soup)
             if raw:
