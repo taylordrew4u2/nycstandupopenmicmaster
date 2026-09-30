@@ -251,3 +251,27 @@ listings are never automatically seeded into the real database.
 - OpenStreetMap tile policy: https://operations.osmfoundation.org/policies/tiles/
 - US Census geocoding API: https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html
 - Authentication guidance: https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+
+### Mic submissions, moderation and About copy
+
+The menu links to `/submit`. Hosts submit their mic and verification details without
+creating an account. A private, unguessable status link shows the administrator's
+decision. Approval publishes the listing and unlocks a seven-day, one-use password
+setup link. Contact information is private. No email service is configured: decisions
+appear on the status page, and the administrator can copy a setup link for direct sharing.
+
+Each listing offers **Report inactive**. Reports appear in the admin Reports tab and
+never hide anything automatically. Only an authenticated administrator can hide or
+restore listings. Missing source entries also remain published and appear under
+Sources for review; failed or ambiguous imports retain the saved data.
+
+The **About page** admin tab edits page copy and the search/social description. Changes
+are stored in the database and safely rendered as plain text. The directory's Host
+status filter offers All mics, Host claimed and Unclaimed. **LAST SYNC AT** shows the
+latest successful online-source check in New York time, excluding manual additions.
+
+The Bushwick Comedy Club adapter reads its public `/open-mics` calendar, accepts only
+event titles explicitly containing “open mic”, and uses actual dated occurrences and
+venue coordinates. It does not assume weekly recurrence or infer performer fees.
+Only exact address/date/time matches join generic directory entries. Secret Pour's
+embedded private calendar is not connected.

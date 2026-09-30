@@ -355,6 +355,10 @@ def extract(content: bytes, config: SourceConfig, content_type='', filename=''):
         if kind == 'auto' and supports(config.url):
             raw = calendar_rows(soup, config.url)
             kind = 'badslava'
+        from .bushwick import supports as bushwick_source, calendar_rows as bushwick_rows
+        if kind == 'auto' and bushwick_source(config.url):
+            raw = bushwick_rows(soup, config.url)
+            kind = 'bushwick'
         if kind in ('auto', 'jsonld'):
             raw = parse_jsonld(soup)
             if raw:

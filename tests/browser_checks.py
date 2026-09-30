@@ -47,7 +47,8 @@ def run():
             assert page.locator('.mic-pin').count()>=1
             assert page.locator('.mic-pin').evaluate_all('(els)=>els.reduce((s,e)=>s+Number(e.dataset.count),0)')==3
             assert all(d in x for x in page.locator('.mic-title').all_text_contents())
-        page.locator('.mic-pin').first.click();assert page.locator('.map-popup').is_visible()
+        page.evaluate('map.focus(map.rows[0].id);map.hide()')
+        page.locator('.mic-pin:not(.mic-cluster)').first.click();page.wait_for_selector('.map-popup')
         page.locator('.popup-mic').first.click();assert page.locator('#modal').is_visible()
         page.get_by_role('button',name='Close dialog').click()
         page.locator('#day-filter').select_option('0')
@@ -58,7 +59,7 @@ def run():
         page.set_viewport_size({'width':1440,'height':1050})
         page.evaluate('state.demo=false;renderAdmin()')
         page.get_by_label('Admin password').fill(TEST_ADMIN_PASSWORD);page.get_by_role('button',name='Sign in',exact=False).click()
-        page.wait_for_selector('.admin-tabs');assert page.locator('[data-admin-tab]').count()==6
+        page.wait_for_selector('.admin-tabs');assert page.locator('[data-admin-tab]').count()==9
         page.get_by_role('button',name='All mics',exact=True).click()
         page.get_by_role('button',name='Add a mic',exact=False).click()
         page.get_by_label('Mic name',exact=True).fill('Browser Test Mic')
