@@ -13,3 +13,11 @@ assert.equal(run("scheduleLabel({frequency:'one-time'})"),'Pop-up mic (not recur
 assert.equal(run("claimLabel({venue_confirmed:true})"),'Venue confirmed');
 assert.equal(run("claimLabel({venue_confirmed:true,claimed:true})"),'Host claimed');
 console.log('Date matching, recurrence, exclusions and labels passed');
+assert(!run("occursOnDate({weekday:null},'2026-10-05')"));
+assert(!run("isBiweekly({frequency:'one-time',notes:'formerly biweekly'})"));
+assert(!run("validDate('2026-02-30')"));
+assert(run("validDate('2028-02-29')"));
+run("state.date=null;state.day=0");
+assert(run("occurs({weekday:0,date:'2020-01-06',sources:[{url:'https://comediq.us/mics.json'}]})"));
+assert.equal(run("scheduleLabel({weekday:0,date:'2020-01-06',sources:[{url:'https://comediq.us/mics.json'}]})"),'Weekly');
+console.log('Regression checks passed');
