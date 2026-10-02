@@ -470,11 +470,14 @@ async function loadPublic(){
   if(state.demo){state.data=demoData();renderDirectory();return;}
   try{state.data=await api('/api/public');renderDirectory();}catch(err){$('#directory-status').textContent='Directory unavailable';$('#cards').innerHTML=blank('Could not load the directory.',esc(err.message),button('Try again','refresh'));}
 }
+const validDate=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(d+'T12:00:00Z'))&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d;
+const generatedSourceDate=row=>row.frequency!=='one-time'&&(row.sources||[]).some(s=>s.url==='https://comediq.us/mics.json')&&!row.overridden_fields?.includes('date');
 function occursOnDate(row,date){
+  if(!validDate(date))return false;
   if((row.excluded_dates||[]).includes(date))return false;
-  const generatedDate=row.frequency!=='one-time'&&(row.sources||[]).some(s=>s.url==='https://comediq.us/mics.json')&&!row.overridden_fields?.includes('date');
+  const generatedDate=generatedSourceDate(row);
   if(row.date&&!generatedDate)return row.date===date;
-  if(Number(row.weekday)!==weekday(date))return false;
+  if(!Number.isInteger(row.weekday)||row.weekday!==weekday(date))return false;
   if(isBiweekly(row)&&row.recurrence_anchor){const diff=Math.round((new Date(date+'T12:00:00Z')-new Date(row.recurrence_anchor+'T12:00:00Z'))/86400000);return diff>=0&&diff%14===0;}
   // Unknown alternate-week anchors stay visible rather than silently dropping a mic.
   return true;
@@ -490,16 +493,15 @@ function renderCalendar(offset=0){
 
 function occurs(row){
   if(state.date)return occursOnDate(row,state.date);
-  if(row.date&&row.date<nyToday())return false;
+  const dated=row.date&&!generatedSourceDate(row);
+  if(dated&&row.date<nyToday())return false;
   if(state.day==='all')return true;
-  const day=Number(state.day);if(row.date)return weekday(row.date)===day;
-  if(row.weekday!==day)return false;
-  const d=new Date(nyToday()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+(day-weekday(nyToday())+7)%7);
-  return !(row.excluded_dates||[]).includes(d.toISOString().slice(0,10));
+  return dated?weekday(row.date)===Number(state.day):row.weekday===Number(state.day);
 }
 function nextDate(row){
   if(state.date)return state.date;
-  if(row.date)return row.date;
+  if(row.date&&!generatedSourceDate(row))return row.date;
+  if(!Number.isInteger(row.weekday))return '9999-12-31';
   const today=nyToday(),d=new Date(today+'T12:00:00Z');
   d.setUTCDate(d.getUTCDate()+(Number(row.weekday)-weekday(today)+7)%7);
   for(let i=0;i<53;i++){const date=d.toISOString().slice(0,10);if(occursOnDate(row,date))return date;d.setUTCDate(d.getUTCDate()+7);}
@@ -507,7 +509,7 @@ function nextDate(row){
 }
 const claimLabel=r=>r.claimed?'Host claimed':r.venue_confirmed?'Venue confirmed':'Unclaimed';
 const claimBadge=r=>`<span class="claim-status ${r.claimed||r.venue_confirmed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':r.venue_confirmed?'Listed on an official venue website. A host can still claim this mic.':'No approved host has claimed this mic.'}">${claimLabel(r)}</span>`;
-function scheduleLabel(r){if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
+function scheduleLabel(r){if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||generatedSourceDate(r)||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
 const scheduleBadge=r=>`<span class="${isBiweekly(r)?'biweekly-badge':'schedule-badge'}">${scheduleLabel(r)}</span>`;
 const micTitle=r=>r.name;
 const updatedAt=r=>Math.max(r.updated_at||0,r.curated_at||0);
@@ -515,7 +517,7 @@ const updatedText=r=>updatedAt(r)?new Intl.DateTimeFormat('en-US',{month:'short'
 const micLink=id=>new URL('/?mic='+encodeURIComponent(id),location.origin==='null'?'https://nycopenmicmasterlist.com':location.origin).href;
 function withinTime(time,from,to){if(!from&&!to)return true;if(!time)return false;return from&&to&&from>to?time>=from||time<=to:(!from||time>=from)&&(!to||time<=to);}
 function isBiweekly(r){
-  return r.frequency==='biweekly'||(r.frequency!=='weekly'&&/\b(?:bi[ -]?weekly|every other (?:week|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i.test([r.name,r.notes].join(' ')));
+  return r.frequency==='biweekly'||(!r.frequency&&/\b(?:bi[ -]?weekly|every other (?:week|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b/i.test([r.name,r.notes].join(' ')));
 }
 function biweeklyThisWeek(r){
   const today=nyToday(),monday=new Date(today+'T12:00:00Z');
@@ -537,7 +539,7 @@ function biweeklyThisWeek(r){
   return null;
 }
 function recurrenceFields(r){
-  return '<div class="form-row">'+selectField('Schedule','frequency',[['weekly','Weekly'],['biweekly','Biweekly (every other week)'],['one-time','Pop-up mic (not recurring)']],r.frequency||(r.date?'one-time':isBiweekly(r)?'biweekly':'weekly'))+field('Confirmed biweekly date','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
+  return '<div class="form-row">'+selectField('Schedule','frequency',[['weekly','Weekly'],['biweekly','Biweekly (every other week)'],['one-time','Pop-up mic (not recurring)']],r.frequency||(isBiweekly(r)?'biweekly':r.date&&!generatedSourceDate(r)?'one-time':'weekly'))+field('Confirmed biweekly date','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
 }
 function syncScheduleForm(form,changed=false){
   if(!form)return;const frequency=$('[name=frequency]',form)?.value;if(!frequency)return;
@@ -915,7 +917,7 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',async e=>{const t=e.target;try{
   if(t.name==='frequency'){syncScheduleForm(t.form,true);if(t.form?.id==='host-edit-form')$('#host-save-state').textContent='Unsaved changes';}
   if(t.id==='host-mic-select'){if(hostDirty()&&!confirm('Discard unsaved changes and switch listings?')){t.value=state.ownerMic;return;}state.ownerMic=t.value;renderHostEditor();}
-  if(t.id==='day-filter'){if(t.value==='calendar'){calendarMonth='';renderCalendar();return;}state.date=/^\d{4}-\d{2}-\d{2}$/.test(t.value)?t.value:null;state.day=state.date||t.value==='all'?'all':Number(t.value);renderDirectory();}
+  if(t.id==='day-filter'){if(t.value==='calendar'){t.value=String(state.date||state.day);calendarMonth='';renderCalendar();return;}state.date=/^\d{4}-\d{2}-\d{2}$/.test(t.value)?t.value:null;state.day=state.date||t.value==='all'?'all':Number(t.value);renderDirectory();}
   if(t.id==='borough-filter'){state.borough=t.value;renderDirectory();}
   if(t.id==='time-from'){state.timeFrom=t.value;renderDirectory();}
   if(t.id==='time-to'){state.timeTo=t.value;renderDirectory();}
@@ -939,7 +941,7 @@ async function boot(){
   else if(location.pathname==='/owner'){await renderOwner();}
   else if(location.pathname==='/claim'){await renderClaim();}
   else if(['/submit','/claim-status'].includes(location.pathname)){await renderSubmit();}
-  else{const selectedDate=new URLSearchParams(location.search).get('date');if(/^\d{4}-\d{2}-\d{2}$/.test(selectedDate||'')&&!Number.isNaN(Date.parse(selectedDate))){state.date=selectedDate;state.day='all';}await loadPublic();const id=new URLSearchParams(location.search).get('mic');if(id){const r=findMic(id);if(r){state.day=r.date?weekday(r.date):r.weekday;renderDirectory();details(id);}else toast('This mic is no longer listed.');}}
+  else{const selectedDate=new URLSearchParams(location.search).get('date');if(validDate(selectedDate)){state.date=selectedDate;state.day='all';}await loadPublic();const id=new URLSearchParams(location.search).get('mic');if(id){const r=findMic(id);if(r){state.date=null;state.day='all';renderDirectory();details(id);}else toast('This mic is no longer listed.');}}
 }
 new ResizeObserver(()=>{if(!$('#view-directory').hidden)renderCards();}).observe($('#cards'));
 boot();
