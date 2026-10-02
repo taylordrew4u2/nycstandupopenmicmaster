@@ -385,6 +385,7 @@ class Store:
             # Read after reconciliation and under the same lock as revocation.
             owners = {r['mic_id']: r['owner_id'] for r in c.execute('SELECT * FROM ownership')}
             overlays = {r['mic_id']: dict(r) for r in c.execute('SELECT * FROM overlays')}
+        from .venue_confirmation import official_venue_source
         listings = []
         conflict_fields = ['start_time', 'signup_time', 'cost', 'purchase_minimum', 'set_minutes', 'status', 'address']
         for identity, items in final_groups.items():
@@ -431,6 +432,7 @@ class Store:
             host_confirmed = curated['updated'] if curated and curated['actor']==owners.get(mic_id) else None
             listings.append({**values, 'id': mic_id, 'sources': all_sources,
                              'map_status':map_status,'hidden':hidden,'claimed':mic_id in owners,
+                             'venue_confirmed':any(s['config']['kind'] != 'upload' and not o['missing_count'] and official_venue_source(s['config']['url']) for o, _, s in items),
                              'curated':bool(curated),'curated_at':curated['updated'] if curated else None,
                              'overridden_fields':list(json.loads(curated['payload'])) if curated else [],
                              'checked_at': observation['last_seen'], 'updated_at': observation['updated'],
