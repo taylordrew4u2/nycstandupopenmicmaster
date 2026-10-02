@@ -1,0 +1,15 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const source=fs.readFileSync('assets/app.js','utf8').split("document.addEventListener(")[0];
+const ctx=vm.createContext({window:{},localStorage:{removeItem(){}},Intl,Date,URL,console});
+vm.runInContext(source,ctx);
+const run=s=>vm.runInContext(s,ctx);
+assert(run("occursOnDate({weekday:0,frequency:'weekly'},'2026-10-05')"));
+assert(!run("occursOnDate({weekday:0,frequency:'weekly'},'2026-10-06')"));
+assert(run("occursOnDate({weekday:0,frequency:'biweekly',recurrence_anchor:'2026-10-05'},'2026-10-19')"));
+assert(!run("occursOnDate({weekday:0,frequency:'biweekly',recurrence_anchor:'2026-10-05'},'2026-10-12')"));
+assert(!run("occursOnDate({weekday:0,excluded_dates:['2026-10-05']},'2026-10-05')"));
+assert(!run("occursOnDate({weekday:0,date:'2026-10-05',frequency:'one-time',sources:[{url:'https://comediq.us/mics.json'}]},'2026-10-12')"));
+assert.equal(run("scheduleLabel({frequency:'one-time'})"),'Pop-up mic (not recurring)');
+assert.equal(run("claimLabel({venue_confirmed:true})"),'Venue confirmed');
+assert.equal(run("claimLabel({venue_confirmed:true,claimed:true})"),'Host claimed');
+console.log('Date matching, recurrence, exclusions and labels passed');

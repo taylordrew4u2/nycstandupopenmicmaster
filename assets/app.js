@@ -13,7 +13,7 @@ const timeText=t=>{if(!t)return 'Not listed';const [h,m]=t.split(':').map(Number
 const ago=n=>{if(!n)return 'Never';const d=Math.max(0,Date.now()/1000-n);return d<60?'Just now':d<3600?`${Math.floor(d/60)}m ago`:d<86400?`${Math.floor(d/3600)}h ago`:`${Math.floor(d/86400)}d ago`;};
 const dateText=d=>new Date(d+'T12:00:00Z').toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});
 try{localStorage.removeItem('miclist-saved');}catch{}
-const state={data:{listings:[],source_count:0,mode:'empty'},demo:!!window.MICLIST_PREVIEW,day:weekday(nyToday()),borough:'all',search:'',cost:'all',signup:'all',claimStatus:'all',hideOffWeek:false,timeFrom:'',timeTo:'',sort:'time',adminTab:'sources',admin:null,community:null,owner:null,preview:null};
+const state={data:{listings:[],source_count:0,mode:'empty'},demo:!!window.MICLIST_PREVIEW,date:nyToday(),day:'all',borough:'all',search:'',cost:'all',signup:'all',claimStatus:'all',hideOffWeek:false,timeFrom:'',timeTo:'',sort:'time',adminTab:'sources',admin:null,community:null,owner:null,preview:null};
 let map;
 state.page=0;state.pageSize=1;state.resultKey='';
 async function api(path,options={}){
@@ -57,7 +57,26 @@ async function loadPublic(){
   if(state.demo){state.data=demoData();renderDirectory();return;}
   try{state.data=await api('/api/public');renderDirectory();}catch(err){$('#directory-status').textContent='Directory unavailable';$('#cards').innerHTML=blank('Could not load the directory.',esc(err.message),button('Try again','refresh'));}
 }
+function occursOnDate(row,date){
+  if((row.excluded_dates||[]).includes(date))return false;
+  const generatedDate=row.frequency!=='one-time'&&(row.sources||[]).some(s=>s.url==='https://comediq.us/mics.json')&&!row.overridden_fields?.includes('date');
+  if(row.date&&!generatedDate)return row.date===date;
+  if(Number(row.weekday)!==weekday(date))return false;
+  if(isBiweekly(row)&&row.recurrence_anchor){const diff=Math.round((new Date(date+'T12:00:00Z')-new Date(row.recurrence_anchor+'T12:00:00Z'))/86400000);return diff>=0&&diff%14===0;}
+  // Unknown alternate-week anchors stay visible rather than silently dropping a mic.
+  return true;
+}
+let calendarMonth='';
+function renderCalendar(offset=0){
+  const month=new Date((calendarMonth||state.date||nyToday()).slice(0,7)+'-01T12:00:00Z');month.setUTCMonth(month.getUTCMonth()+offset);calendarMonth=month.toISOString().slice(0,10);
+  const year=month.getUTCFullYear(),m=month.getUTCMonth(),count=new Date(Date.UTC(year,m+1,0)).getUTCDate(),start=(month.getUTCDay()+6)%7;
+  let cells=DAYS.map(d=>`<span class="calendar-weekday">${d.slice(0,3)}</span>`).join('')+'<span></span>'.repeat(start);
+  for(let day=1;day<=count;day++){const date=`${year}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;cells+=`<button class="calendar-day ${date===state.date?'selected':''}" data-action="calendar-date" data-id="${date}" aria-label="View mics for ${date}" ${date===nyToday()?'aria-current="date"':''}>${day}</button>`;}
+  modal('Calendar',`<div class="calendar-heading">${button('←','calendar-prev')}<strong>${month.toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'})}</strong>${button('→','calendar-next')}</div><div class="calendar-grid">${cells}</div><p class="form-helper">Choose a date to view mics. Biweekly mics with unconfirmed dates remain visible; check their details.</p>`,button('Today','calendar-date',nyToday())+button('All dates','calendar-clear'));
+}
+
 function occurs(row){
+  if(state.date)return occursOnDate(row,state.date);
   if(row.date&&row.date<nyToday())return false;
   if(state.day==='all')return true;
   const day=Number(state.day);if(row.date)return weekday(row.date)===day;
@@ -66,13 +85,17 @@ function occurs(row){
   return !(row.excluded_dates||[]).includes(d.toISOString().slice(0,10));
 }
 function nextDate(row){
+  if(state.date)return state.date;
   if(row.date)return row.date;
   const today=nyToday(),d=new Date(today+'T12:00:00Z');
   d.setUTCDate(d.getUTCDate()+(Number(row.weekday)-weekday(today)+7)%7);
-  for(let i=0;i<53;i++){const date=d.toISOString().slice(0,10);if(!(row.excluded_dates||[]).includes(date))return date;d.setUTCDate(d.getUTCDate()+7);}
+  for(let i=0;i<53;i++){const date=d.toISOString().slice(0,10);if(occursOnDate(row,date))return date;d.setUTCDate(d.getUTCDate()+7);}
   return '9999-12-31';
 }
-const claimBadge=r=>`<span class="claim-status ${r.claimed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':'No approved host has claimed this mic.'}">${r.claimed?'Host claimed':'Unclaimed'}</span>`;
+const claimLabel=r=>r.claimed?'Host claimed':r.venue_confirmed?'Venue confirmed':'Unclaimed';
+const claimBadge=r=>`<span class="claim-status ${r.claimed||r.venue_confirmed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':r.venue_confirmed?'Listed on an official venue website. A host can still claim this mic.':'No approved host has claimed this mic.'}">${claimLabel(r)}</span>`;
+function scheduleLabel(r){if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
+const scheduleBadge=r=>`<span class="${isBiweekly(r)?'biweekly-badge':'schedule-badge'}">${scheduleLabel(r)}</span>`;
 const micTitle=r=>r.name;
 const updatedAt=r=>Math.max(r.updated_at||0,r.curated_at||0);
 const updatedText=r=>updatedAt(r)?new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/New_York'}).format(new Date(updatedAt(r)*1000)):'not recorded';
@@ -101,7 +124,7 @@ function biweeklyThisWeek(r){
   return null;
 }
 function recurrenceFields(r){
-  return '<div class="form-row">'+selectField('Schedule','frequency',[['weekly','Weekly'],['biweekly','Biweekly (every other week)'],['one-time','One-time']],r.frequency||(r.date?'one-time':isBiweekly(r)?'biweekly':'weekly'))+field('Confirmed biweekly date','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
+  return '<div class="form-row">'+selectField('Schedule','frequency',[['weekly','Weekly'],['biweekly','Biweekly (every other week)'],['one-time','Pop-up mic (not recurring)']],r.frequency||(r.date?'one-time':isBiweekly(r)?'biweekly':'weekly'))+field('Confirmed biweekly date','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
 }
 function syncScheduleForm(form,changed=false){
   if(!form)return;const frequency=$('[name=frequency]',form)?.value;if(!frequency)return;
@@ -111,11 +134,11 @@ function syncScheduleForm(form,changed=false){
   if(anchor){anchor.closest('.field').hidden=frequency!=='biweekly';anchor.required=form.id==='mic-proposal-form'&&frequency==='biweekly';if(changed&&frequency!=='biweekly')anchor.value='';}
 }
 function filtered(){return state.data.listings.filter(r=>{
-  if(state.hideOffWeek&&isBiweekly(r)&&biweeklyThisWeek(r)===false)return false;
-  if(state.claimStatus==='claimed'&&!r.claimed)return false;if(state.claimStatus==='unclaimed'&&r.claimed)return false;
+  if(!state.date&&state.hideOffWeek&&isBiweekly(r)&&biweeklyThisWeek(r)===false)return false;
+  if(state.claimStatus==='venue'&&!r.venue_confirmed)return false;if(state.claimStatus==='claimed'&&!r.claimed)return false;if(state.claimStatus==='unclaimed'&&r.claimed)return false;
   if(!occurs(r))return false;if(state.borough!=='all'&&r.borough!==state.borough)return false;
   if(!withinTime(r.start_time,state.timeFrom,state.timeTo))return false;
-  if(state.search&&!`${r.name} ${r.venue} ${r.address} ${r.borough} ${r.neighborhood}`.toLowerCase().includes(state.search))return false;
+  if(state.search&&!`${r.name} ${r.venue} ${r.address} ${r.borough} ${r.neighborhood} ${DAYS[r.weekday]||''} ${r.date||''} ${r.date?dateText(r.date):''}`.toLowerCase().includes(state.search))return false;
   if(state.cost==='free'&&r.cost!==0)return false;if(['5','10'].includes(state.cost)&&(r.cost===null||r.cost>Number(state.cost)))return false;
   if(state.signup!=='all'&&!String(r.signup_method).toLowerCase().includes(state.signup))return false;return true;
 }).sort((a,b)=>state.sort==='name'?micTitle(a).localeCompare(micTitle(b)):state.sort==='price'?(a.cost??999)-(b.cost??999):(nextDate(a)+a.start_time).localeCompare(nextDate(b)+b.start_time));}
@@ -124,7 +147,9 @@ function renderDirectory(){
   $('#preview-banner').hidden=!state.demo;
   $('#preview-banner').innerHTML=`Demo · Fictional mics${window.MICLIST_PREVIEW?'':' <button data-action="exit-demo">Exit demo</button>'}`;
   $('#directory-status').textContent=state.demo?'Fictional examples':`${state.data.listings.length} listings`;
-  $('#day-filter').innerHTML=[['all','All days'],...DAYS.map((d,i)=>[i,d+(i===weekday(nyToday())?' · Today':'')])].map(([v,d])=>`<option value="${v}" ${String(state.day)===String(v)?'selected':''}>${d}</option>`).join('');
+  const dateOptions=Array.from({length:7},(_,i)=>{const d=new Date(nyToday()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+i);const date=d.toISOString().slice(0,10);return [date,d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',timeZone:'UTC'})+(i===0?' · Today':'')];});
+  if(state.date&&!dateOptions.some(([v])=>v===state.date))dateOptions.unshift([state.date,new Date(state.date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',timeZone:'UTC'})]);
+  $('#day-filter').innerHTML=[['all','All days / dates'],...dateOptions,...DAYS.map((d,i)=>[i,'Every '+d]),['calendar','Pick a date…']].map(([v,d])=>`<option value="${v}" ${String(state.date||state.day)===String(v)?'selected':''}>${esc(d)}</option>`).join('');
   $('#borough-filter').value=state.borough;
   const active=state.cost!=='all'||state.signup!=='all'||state.claimStatus!=='all'||state.timeFrom||state.timeTo||state.hideOffWeek;
   $('#more-filters').classList.toggle('active',active);
@@ -135,7 +160,7 @@ function renderDirectory(){
 }
 function renderCards(){
   const rows=filtered(),box=$('#cards');
-  const key=JSON.stringify([state.day,state.borough,state.search,state.cost,state.signup,state.claimStatus,state.timeFrom,state.timeTo,state.sort,state.hideOffWeek]);
+  const key=JSON.stringify([state.date,state.day,state.borough,state.search,state.cost,state.signup,state.claimStatus,state.timeFrom,state.timeTo,state.sort,state.hideOffWeek]);
   if(key!==state.resultKey){state.page=0;state.resultKey=key;}
   const rowHeight=parseFloat(getComputedStyle(box).getPropertyValue('--row-height'))||52;
   const size=Math.max(1,Math.floor(box.clientHeight/rowHeight));
@@ -153,11 +178,11 @@ function card(r){
   const cost=r.cost===0?'Free':r.cost!=null?`$${r.cost}`:r.cost_text?'See fee':'—';
   const located=r.status==='scheduled'&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);
   const title=micTitle(r),venue=`${r.venue} · ${r.borough}`;
-  return `<article class="mic-card ${isBiweekly(r)?'biweekly-mic':''}" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):r.date?esc(dateText(r.date)):esc(DAYS[r.weekday]?.slice(0,3)||'TBD')}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button></div><div class="mic-meta">${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}${isBiweekly(r)?'<span class="biweekly-badge" title="'+(biweeklyThisWeek(r)===null?'Dates unconfirmed':biweeklyThisWeek(r)?'Scheduled this week':'Off this week')+'">Biweekly</span>':''}${claimBadge(r)}</div><small class="row-updated" title="${updatedAt(r)?esc(new Date(updatedAt(r)*1000).toLocaleString()):'Not recorded'}">Updated ${esc(updatedText(r))}</small></div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
+  return `<article class="mic-card ${isBiweekly(r)?'biweekly-mic':''}" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):esc(isBiweekly(r)&&!r.date&&!r.recurrence_anchor?'Dates unconfirmed':new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'}))}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button></div><div class="mic-meta">${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}${scheduleBadge(r)}${claimBadge(r)}</div><small class="row-updated" title="${updatedAt(r)?esc(new Date(updatedAt(r)*1000).toLocaleString()):'Not recorded'}">Updated ${esc(updatedText(r))}</small></div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
 }
 function filtersDialog(){
   const option=(v,t,current)=>`<option value="${v}" ${current===v?'selected':''}>${t}</option>`;
-  modal('Filters',`<div class="filter-options"><label>Entry fee<select id="cost">${[['all','Any price'],['free','Free'],['5','$5 or less'],['10','$10 or less']].map(([v,t])=>option(v,t,state.cost)).join('')}</select></label><label>Sort<select id="sort">${[['time','Date & time'],['price','Lowest fee'],['name','Mic name']].map(([v,t])=>option(v,t,state.sort)).join('')}</select></label><label>Host status<select id="claim-filter">${[['all','All mics'],['claimed','Host claimed'],['unclaimed','Unclaimed']].map(([v,t])=>option(v,t,state.claimStatus)).join('')}</select></label><label>Biweekly mics<select id="biweekly-filter">${option('all','Show all',state.hideOffWeek?'current':'all')}${option('current','Hide mics off this week',state.hideOffWeek?'current':'all')}</select><small>Purple = biweekly. Unconfirmed dates stay visible.</small></label><label>Start time from<input id="time-from" type="time" value="${esc(state.timeFrom)}"></label><label>Start time until<input id="time-to" type="time" value="${esc(state.timeTo)}"></label></div>`,button('Reset','reset')+button('Done','close','','primary'));
+  modal('Filters',`<div class="filter-options"><label>Entry fee<select id="cost">${[['all','Any price'],['free','Free'],['5','$5 or less'],['10','$10 or less']].map(([v,t])=>option(v,t,state.cost)).join('')}</select></label><label>Sort<select id="sort">${[['time','Date & time'],['price','Lowest fee'],['name','Mic name']].map(([v,t])=>option(v,t,state.sort)).join('')}</select></label><label>Host status<select id="claim-filter">${[['all','All mics'],['claimed','Host claimed'],['venue','Venue confirmed'],['unclaimed','Unclaimed (including venue confirmed)']].map(([v,t])=>option(v,t,state.claimStatus)).join('')}</select></label><label>Biweekly mics<select id="biweekly-filter">${option('all','Show all',state.hideOffWeek?'current':'all')}${option('current','Hide mics off this week',state.hideOffWeek?'current':'all')}</select><small>Purple = biweekly. Unconfirmed dates stay visible.</small></label><label>Start time from<input id="time-from" type="time" value="${esc(state.timeFrom)}"></label><label>Start time until<input id="time-to" type="time" value="${esc(state.timeTo)}"></label></div>`,button('Reset','reset')+button('Done','close','','primary'));
 }
 function findMic(id){return state.data.listings.find(r=>r.id===id)||state.community?.listings?.find(r=>r.id===id)||state.owner?.listings?.find(r=>r.id===id);}
 function details(id,tab='mic',page=0){
@@ -166,7 +191,7 @@ function details(id,tab='mic',page=0){
   const tabs=['mic','hosts','notes','sources','link'].map(t=>`<button class="compact-button ${tab===t?'active':''}" data-action="detail-tab" data-id="${esc(id)}" data-tab="${t}" aria-pressed="${tab===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
   let body='';
   if(tab==='mic'){
-    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${isBiweekly(r)?item('REPEATS','Biweekly · '+(biweeklyThisWeek(r)===null?'dates unconfirmed':biweeklyThisWeek(r)?'on this week':'off this week')):''}${item('WHEN',`${r.date?dateText(r.date):DAYS[r.weekday]} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('STATUS',r.status+' · '+(r.claimed?'Host claimed':'Unclaimed'))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?(badslava\.com|comediq\.us)\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
+    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('REPEATS',scheduleLabel(r)+(isBiweekly(r)?' · '+(biweeklyThisWeek(r)===null?'dates unconfirmed':biweeklyThisWeek(r)?'on this week':'off this week'):''))}${item('WHEN',`${isBiweekly(r)&&!r.date&&!r.recurrence_anchor?DAYS[r.weekday]+' · dates unconfirmed':new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',timeZone:'UTC'})} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('STATUS',r.status+' · '+claimLabel(r))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?(badslava\.com|comediq\.us)\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
   }else if(tab==='hosts'){
     const links=String(r.host_socials||'').split(/\s+/).filter(Boolean);
     body=`<p>${esc(r.host_names||'Host not listed')}</p><div class="host-links">${links.map(u=>external(u,new URL(safeUrl(u)||'https://example.com').hostname.replace('www.',''),'button quiet')).join('')}</div><p class="form-helper">${r.claimed?'An approved host can update these details.':'Host details are from the source unless a host claims this mic.'}</p>`;
@@ -397,7 +422,7 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
   const menu=$('#site-menu');if(menu&&(!menu.contains(e.target)||e.target.closest('nav')))menu.open=false;
   if(window.MICLIST_PREVIEW){const link=e.target.closest('a[href]');if(link&&['/admin','/owner','/'].includes(link.getAttribute('href'))){e.preventDefault();if(link.getAttribute('href')==='/admin'){await renderAdmin();}else if(link.getAttribute('href')==='/owner'){await renderOwner();}else{$('#view-directory').hidden=false;$('#view-sources').hidden=true;renderDirectory();}return;}}
-  const day=e.target.closest('[data-day]');if(day){state.day=day.dataset.day==='all'?'all':Number(day.dataset.day);renderDirectory();return;}
+  const day=e.target.closest('[data-day]');if(day){state.date=null;state.day=day.dataset.day==='all'?'all':Number(day.dataset.day);renderDirectory();return;}
   const borough=e.target.closest('[data-borough]');if(borough){state.borough=borough.dataset.borough;renderDirectory();return;}
   const aboutButton=e.target.closest('[data-about-tab]');if(aboutButton){$$('[data-about-panel]').forEach(p=>p.hidden=p.dataset.aboutPanel!==aboutButton.dataset.aboutTab);$$('[data-about-tab]').forEach(b=>{const active=b===aboutButton;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});return;}
   const submissionButton=e.target.closest('[data-submission-tab]');if(submissionButton){submissionTab(submissionButton.dataset.submissionTab);return;}
@@ -405,6 +430,10 @@ document.addEventListener('click',async e=>{
   const tab=e.target.closest('[data-admin-tab]');if(tab){if(tab.dataset.adminTab===state.adminTab)return;if(aboutDirty()&&!confirm('Discard unsaved About page changes?'))return;state.adminTab=tab.dataset.adminTab;$$('[data-admin-tab]').forEach(t=>t.classList.toggle('active',t===tab));renderAdminBody();return;}
   const el=e.target.closest('[data-action]');if(!el)return;const action=el.dataset.action,id=el.dataset.id;e.preventDefault();
   try{
+    if(action==='calendar'){calendarMonth='';renderCalendar();}
+    if(action==='calendar-prev')renderCalendar(-1);
+    if(action==='calendar-next')renderCalendar(1);
+    if(action==='calendar-date'||action==='calendar-clear'){if(location.pathname!=='/'){location.href=action==='calendar-date'?'/?date='+encodeURIComponent(id):'/';return;}state.date=action==='calendar-date'?id:null;state.day='all';$('#modal').close();renderDirectory();}
     if(action==='visitors-refresh')await loadVisitorStats();
     if(action==='proposal-refresh')await renderProposalStatus();
     if(action==='copy-proposal-link'){try{await navigator.clipboard.writeText(location.href);toast('Private status link copied.');}catch{$('#proposal-status-link').focus();$('#proposal-status-link').select();toast('Select and copy your private link.');}}
@@ -413,7 +442,7 @@ document.addEventListener('click',async e=>{
     if(action==='donate'){modal('Donate','<p>Support NYC Open Mic Master List.</p><div class="donation-options"><button class="button quiet" disabled>Cash App</button><button class="button quiet" disabled>Venmo</button></div><p class="form-helper">Donation links coming soon.</p>');}
 
     if(action==='refresh'){await loadPublic();toast('Loaded the latest saved listings.');}
-    if(action==='reset'){if($('#biweekly-filter'))$('#biweekly-filter').value='all';Object.assign(state,{day:'all',borough:'all',search:'',cost:'all',signup:'all',claimStatus:'all',hideOffWeek:false,timeFrom:'',timeTo:'',sort:'time'});if($('#sort'))$('#sort').value='time';$('#search').value='';if($('#claim-filter'))$('#claim-filter').value='all';if($('#cost'))$('#cost').value='all';if($('#signup-filter'))$('#signup-filter').value='all';if($('#time-from'))$('#time-from').value='';if($('#time-to'))$('#time-to').value='';renderDirectory();}
+    if(action==='reset'){if($('#biweekly-filter'))$('#biweekly-filter').value='all';Object.assign(state,{date:null,day:'all',borough:'all',search:'',cost:'all',signup:'all',claimStatus:'all',hideOffWeek:false,timeFrom:'',timeTo:'',sort:'time'});if($('#sort'))$('#sort').value='time';$('#search').value='';if($('#claim-filter'))$('#claim-filter').value='all';if($('#cost'))$('#cost').value='all';if($('#signup-filter'))$('#signup-filter').value='all';if($('#time-from'))$('#time-from').value='';if($('#time-to'))$('#time-to').value='';renderDirectory();}
     if(action==='filters')filtersDialog();
     if(action==='previous-page'||action==='next-page'){state.page+=action==='next-page'?1:-1;renderCards();}
     if(action==='detail-tab')details(id,el.dataset.tab,Number(el.dataset.page||0));
@@ -473,7 +502,7 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',async e=>{const t=e.target;try{
   if(t.name==='frequency'){syncScheduleForm(t.form,true);if(t.form?.id==='host-edit-form')$('#host-save-state').textContent='Unsaved changes';}
   if(t.id==='host-mic-select'){if(hostDirty()&&!confirm('Discard unsaved changes and switch listings?')){t.value=state.ownerMic;return;}state.ownerMic=t.value;renderHostEditor();}
-  if(t.id==='day-filter'){state.day=t.value==='all'?'all':Number(t.value);renderDirectory();}
+  if(t.id==='day-filter'){if(t.value==='calendar'){calendarMonth='';renderCalendar();return;}state.date=/^\d{4}-\d{2}-\d{2}$/.test(t.value)?t.value:null;state.day=state.date||t.value==='all'?'all':Number(t.value);renderDirectory();}
   if(t.id==='borough-filter'){state.borough=t.value;renderDirectory();}
   if(t.id==='time-from'){state.timeFrom=t.value;renderDirectory();}
   if(t.id==='time-to'){state.timeTo=t.value;renderDirectory();}
@@ -497,7 +526,7 @@ async function boot(){
   else if(location.pathname==='/owner'){await renderOwner();}
   else if(location.pathname==='/claim'){await renderClaim();}
   else if(['/submit','/claim-status'].includes(location.pathname)){await renderSubmit();}
-  else{await loadPublic();const id=new URLSearchParams(location.search).get('mic');if(id){const r=findMic(id);if(r){state.day=r.date?weekday(r.date):r.weekday;renderDirectory();details(id);}else toast('This mic is no longer listed.');}}
+  else{const selectedDate=new URLSearchParams(location.search).get('date');if(/^\d{4}-\d{2}-\d{2}$/.test(selectedDate||'')&&!Number.isNaN(Date.parse(selectedDate))){state.date=selectedDate;state.day='all';}await loadPublic();const id=new URLSearchParams(location.search).get('mic');if(id){const r=findMic(id);if(r){state.day=r.date?weekday(r.date):r.weekday;renderDirectory();details(id);}else toast('This mic is no longer listed.');}}
 }
 new ResizeObserver(()=>{if(!$('#view-directory').hidden)renderCards();}).observe($('#cards'));
 boot();
