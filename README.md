@@ -8,6 +8,13 @@
 ![PostgreSQL | SQLite](https://img.shields.io/badge/db-PostgreSQL%20%7C%20SQLite-4169E1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
 
+## Demo
+
+![Browsing the directory: open the demo, show all days, zoom the map, filter to Brooklyn, search, and open a mic's details](docs/media/demo.gif)
+
+*Recorded from a local run using the app's built-in demo mode, which shows fictional
+example mics. Map tiles are from OpenStreetMap.*
+
 ## Overview
 
 Open mic schedules in NYC are scattered across club websites, aggregator feeds and
@@ -40,6 +47,16 @@ directly, with every change scoped and audited.
 - Host dashboard scoped to approved mics only; claims carry forward to future dated occurrences.
 - Admin control room for sources, submissions, claims, host access, the audit log and About page copy.
 - Privacy-preserving visitor counts (hashed cookie, no IPs; honors DNT and GPC).
+
+## Screenshots
+
+| Directory and map | Filtered to Brooklyn, $5 or less |
+| --- | --- |
+| ![Directory with list of mics beside a five-borough map with grouped pins](docs/media/directory-desktop.png) | ![Directory filtered to Brooklyn mics at $5 or less, with the active Filters indicator](docs/media/filters-desktop.png) |
+| **Mic details** | **Admin: preview before publishing** |
+| ![Mic detail dialog with schedule, signup, fee, stage time and claim actions](docs/media/mic-detail-desktop.png) | ![Admin import preview of examples/DEMO-mics.csv showing seven parsed listings before approval](docs/media/admin-import-preview.png) |
+
+<p align="center"><img src="docs/media/directory-phone.png" alt="Phone layout at 390px wide: filters, map and paginated list in one viewport" width="300"></p>
 
 ## Tech stack
 
@@ -129,7 +146,7 @@ assets/         static frontend (HTML, CSS, vanilla JS, map renderer)
 scripts/        backup, preview build, scheduled sync trigger
 tests/          pytest suite and Playwright browser checks
 examples/       CSV import template and fictional demo data
-docs/           administration, deployment, directory and testing guides
+docs/           administration, deployment, directory and testing guides; media/ holds README images
 ```
 
 ## Deployment
