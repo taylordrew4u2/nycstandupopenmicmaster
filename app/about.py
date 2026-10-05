@@ -43,6 +43,7 @@ def render(store):
     structured = document.find('script', attrs={'type': 'application/ld+json'})
     data = json.loads(structured.string)
     data['description'] = content.seo_description
+    data['author'] = {'@type': 'Person', 'name': 'Taylor Drew', 'description': 'New York City stand-up comedian and producer of Pins & Needles Comedy'}
     # Escape HTML-significant characters before placing JSON in a script element.
     structured.string = json.dumps(data, ensure_ascii=False).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     return str(document)

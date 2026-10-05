@@ -23,12 +23,12 @@ def request(headers=None):
 def test_public_total_counts_repeat_visits_and_persists(tmp_path):
     path = tmp_path/'visits.db'
     store, routes = endpoints(path)
-    assert asyncio.run(routes['/api/visits']()) == {'total':0, 'started_at':None}
+    assert asyncio.run(routes['/api/visits']()) == {'total':1000, 'tracked_total':0, 'starting_offset':1000, 'started_at':None}
     for _ in range(3):
         assert asyncio.run(routes['/api/visit'](request())).status_code == 204
     result = asyncio.run(routes['/api/visits']())
-    assert set(result) == {'total', 'started_at'}
-    assert result['total'] == 3 and result['started_at'] > 0
+    assert set(result) == {'total', 'started_at', 'tracked_total', 'starting_offset'}
+    assert result['total'] == 1003 and result['tracked_total'] == 3 and result['started_at'] > 0
     with store.connect() as c:
         assert c.execute('SELECT COUNT(*) FROM visitors').fetchone()[0] == 1
     _, restarted = endpoints(path)
@@ -42,4 +42,4 @@ def test_concurrent_visits_do_not_lose_increments(tmp_path):
     _, routes = endpoints(tmp_path/'visits.db')
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda _: asyncio.run(routes['/api/visit'](request())), range(12)))
-    assert asyncio.run(routes['/api/visits']())['total'] == 12
+    assert asyncio.run(routes['/api/visits']())['total'] == 1012

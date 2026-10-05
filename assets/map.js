@@ -124,18 +124,23 @@ class MicMap {
     for(const [id,tile]of this.tiles)if(!keep.has(id)){tile.remove();this.tiles.delete(id);}
     this.pins.replaceChildren();
     if(this.zoom<=11)for(const [name,lat,lng]of [['Manhattan',40.795,-73.988],['Brooklyn',40.635,-73.95],['Queens',40.735,-73.78],['Bronx',40.87,-73.86],['Staten Island',40.555,-74.16]]){const [x,y]=this.project(lat,lng);const label=document.createElement('span');label.className='map-borough';label.textContent=name;label.style.left=`${x-left}px`;label.style.top=`${y-top}px`;this.pins.append(label);}
-    const groups=new Map();
-    for(const row of this.rows){if(!Number.isFinite(row.latitude)||!Number.isFinite(row.longitude))continue;const key=`${row.latitude}|${row.longitude}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
-    const clusters=[];
-    for(const rows of groups.values()){
-      const row=rows[0],[px,py]=this.project(row.latitude,row.longitude),x=px-left,y=py-top;
-      if(x<-40||y<-40||x>w+40||y>h+40)continue;
-      const nearby=this.zoom<15&&clusters.find(c=>Math.abs(c.x-x)<42&&Math.abs(c.y-y)<44);
-      if(nearby){const total=nearby.rows.length+rows.length;nearby.x=(nearby.x*nearby.rows.length+x*rows.length)/total;nearby.y=(nearby.y*nearby.rows.length+y*rows.length)/total;nearby.rows.push(...rows);nearby.grouped=true;}
-      else clusters.push({x,y,rows:[...rows]});
-    }
-    for(const {x,y,rows,grouped=false} of clusters){
-      const button=document.createElement('button');button.type='button';button.className='mic-pin'+(grouped?' mic-cluster':'');button.classList.toggle('confirmed-pin',rows.every(r=>r.claimed||r.venue_confirmed));button.classList.toggle('biweekly-pin',rows.every(r=>typeof isBiweekly==='function'&&isBiweekly(r)));button.classList.toggle('mixed-biweekly-pin',rows.some(r=>typeof isBiweekly==='function'&&isBiweekly(r))&&!rows.every(r=>typeof isBiweekly==='function'&&isBiweekly(r)));button.dataset.count=rows.length;const pinId='pushpin-'+(++micPinSequence);button.innerHTML=`<svg viewBox="0 0 44 48" aria-hidden="true" focusable="false"><defs><linearGradient id="${pinId}-steel"><stop stop-color="#666"/><stop offset=".4" stop-color="#f4f4f4"/><stop offset=".7" stop-color="#aaa"/><stop offset="1" stop-color="#555"/></linearGradient><radialGradient id="${pinId}-head" cx="65%" cy="25%" r="80%"><stop stop-color="#fff"/><stop offset=".16" stop-color="currentColor"/><stop offset=".63" stop-color="currentColor"/><stop offset="1" stop-color="#15202b"/></radialGradient></defs><path d="M20.5 23H23.5L23 41Q22.8 46 22 48Q21.2 46 21 41Z" fill="url(#${pinId}-steel)"/><circle class="pushpin-head" cx="22" cy="14" r="12" style="fill:url(#${pinId}-head)"/><ellipse class="pushpin-glint" cx="27" cy="7" rx="2.3" ry="1.5" transform="rotate(35 27 7)"/>${rows.length>1?`<text x="22" y="15" dy=".35em" text-anchor="middle" font-size="${rows.length>99?9:11}">${rows.length}</text>`:''}</svg>`;button.style.left=`${x}px`;button.style.top=`${y}px`;button.setAttribute('aria-label',grouped?`Zoom into ${rows.length} nearby mics`:`${rows.length} mic${rows.length===1?'':'s'} at ${rows[0].venue}`);button.title=(grouped?'Nearby venues — click to zoom':rows[0].venue)+' · '+(button.classList.contains('biweekly-pin')?'Purple: biweekly':button.classList.contains('confirmed-pin')?'Green: host claimed or venue confirmed':'Blue: includes unclaimed mics')+(button.classList.contains('mixed-biweekly-pin')?' · Purple ring: includes biweekly mics':'');button.addEventListener('click',()=>{if(grouped){this.center=this.unproject(x+left,y+top);this.zoom=Math.min(19,this.zoom+2);this.hide();this.draw();}else this.show(rows,x,y);});this.pins.append(button);
+    // One marker per mic. Never average or offset its supplied coordinates.
+    for(const row of this.rows){
+      if(!Number.isFinite(row.latitude)||!Number.isFinite(row.longitude))continue;
+      const [px,py]=this.project(row.latitude,row.longitude),x=px-left,y=py-top;
+      if(x<-44||y<-44||x>w+44||y>h+44)continue;
+      const button=document.createElement('button');button.type='button';button.className='mic-pin';
+      button.classList.toggle('confirmed-pin',!!(row.claimed||row.venue_confirmed));
+      button.classList.toggle('biweekly-pin',typeof isBiweekly==='function'&&isBiweekly(row));
+      button.dataset.micId=row.id;
+      const pinId='pushpin-'+(++micPinSequence);
+      button.innerHTML=`<svg viewBox="0 0 44 44" aria-hidden="true" focusable="false"><defs><linearGradient id="${pinId}-steel"><stop stop-color="#666"/><stop offset=".4" stop-color="#f4f4f4"/><stop offset=".7" stop-color="#aaa"/><stop offset="1" stop-color="#555"/></linearGradient><radialGradient id="${pinId}-head" cx="65%" cy="25%" r="80%"><stop stop-color="#fff"/><stop offset=".16" stop-color="currentColor"/><stop offset=".63" stop-color="currentColor"/><stop offset="1" stop-color="#15202b"/></radialGradient></defs><path d="M21 26H23L22.6 39Q22.4 43 22 44Q21.6 43 21.4 39Z" fill="url(#${pinId}-steel)"/><circle class="pushpin-head" cx="22" cy="21" r="6" style="fill:url(#${pinId}-head)"/><ellipse class="pushpin-glint" cx="24.5" cy="18" rx="1.1" ry=".8" transform="rotate(35 24.5 18)"/></svg>`;
+      button.style.left=`${x}px`;button.style.top=`${y}px`;
+      const status=button.classList.contains('biweekly-pin')?'Biweekly':row.claimed?'Host claimed':row.venue_confirmed?'Venue confirmed':'Unclaimed';
+      button.setAttribute('aria-label',`${row.name} at ${row.venue} · ${status}`);
+      button.title=`${row.name} · ${row.venue} · ${status}`;
+      button.addEventListener('click',()=>this.onSelect(row.id));
+      this.pins.append(button);
     }
   }
   show(rows,x,y,page=0){

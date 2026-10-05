@@ -46,7 +46,8 @@ def register(app, store, admin, local_dev):
         with store.connect() as c:
             rows = c.execute("SELECT key,value FROM meta WHERE key IN ('public_visit_total','public_visits_started')").fetchall()
         values = {row['key']: row['value'] for row in rows}
-        return {'total': int(values.get('public_visit_total', 0)),
+        tracked = int(values.get('public_visit_total', 0))
+        return {'total': 1000 + tracked, 'tracked_total': tracked, 'starting_offset': 1000,
                 'started_at': float(values['public_visits_started']) if 'public_visits_started' in values else None}
 
     @app.get('/api/admin/visitors', dependencies=[Depends(admin)])
