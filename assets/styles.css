@@ -202,3 +202,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .mic-pin.confirmed-pin:not(.biweekly-pin){color:#277746!important}
 
 .calendar-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.calendar-weekday{text-align:center;font-size:11px}.calendar-day{min-width:0;padding:10px 2px;border:1px solid var(--line);background:white;color:var(--ink)}.calendar-day[aria-current=date]{border:2px solid var(--red)}.calendar-day.selected{background:#dce9fa}
+
+/* Small public counter shares the menu corner without covering the map. */
+.corner-controls{display:grid;justify-items:end;flex:none;gap:1px;min-width:0}.visit-count{font:10px/1.2 Tahoma,Verdana,Arial,sans-serif;color:#eef5ff;white-space:nowrap;font-variant-numeric:tabular-nums}

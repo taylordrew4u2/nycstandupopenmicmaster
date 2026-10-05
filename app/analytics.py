@@ -34,10 +34,20 @@ def register(app, store, admin, local_dev):
             c.execute('''INSERT INTO visitors VALUES (?,?,?) ON CONFLICT(visitor_hash)
                          DO UPDATE SET last_seen=excluded.last_seen''',
                       (hashlib.sha256(token.encode()).hexdigest(), now, now))
+            c.execute("INSERT INTO meta(key,value) VALUES ('public_visit_total','1') ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(meta.value AS BIGINT)+1 AS TEXT)")
+            c.execute("INSERT INTO meta(key,value) VALUES ('public_visits_started',?) ON CONFLICT(key) DO NOTHING", (str(now),))
         if fresh:
             response.set_cookie(COOKIE, token, max_age=365*86400, secure=not local_dev,
                                 httponly=True, samesite='lax')
         return response
+
+    @app.get('/api/visits')
+    async def public_visits():
+        with store.connect() as c:
+            rows = c.execute("SELECT key,value FROM meta WHERE key IN ('public_visit_total','public_visits_started')").fetchall()
+        values = {row['key']: row['value'] for row in rows}
+        return {'total': int(values.get('public_visit_total', 0)),
+                'started_at': float(values['public_visits_started']) if 'public_visits_started' in values else None}
 
     @app.get('/api/admin/visitors', dependencies=[Depends(admin)])
     async def visitors():
