@@ -1,317 +1,171 @@
 # NYC Open Mic Master List
 
-A working, self-hosted open-mic directory with a source manager, automatic polling,
-a five-borough map, public corrections, moderated claims, and scoped host accounts.
+**A self-updating directory of New York City stand-up open mics that pulls listings from many sources, puts them on a five-borough map, and lets real hosts claim and maintain their own mics.**
 
-**Hosting:** the production site uses Vercel, hosted PostgreSQL, and scheduled
-Badslava and Comediq source checks. The standalone preview contains explicitly
-fictional listings and does not support real accounts.
+[![Live site](https://img.shields.io/badge/live-nycopenmicmasterlist.com-0a7d5a)](https://nycopenmicmasterlist.com)
+![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.128-009688?logo=fastapi&logoColor=white)
+![PostgreSQL | SQLite](https://img.shields.io/badge/db-PostgreSQL%20%7C%20SQLite-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
 
-## Start on your Mac
+## Demo
 
-1. Unzip the project.
-2. Double-click `Start-Mic-List.command`. Python 3.11+ and an internet connection for
-   the initial dependency install are required. Alternatively, open Terminal in the
-   project folder and run `bash Start-Mic-List.command`.
-3. Open `http://127.0.0.1:8000`.
-4. Enter a unique admin password when the launcher prompts, then open
-   `http://127.0.0.1:8000/admin` and sign in with it.
-5. Add a source, preview its extracted listings, and approve the import.
+![Browsing the directory: open the demo, show all days, zoom the map, filter to Brooklyn, search, and open a mic's details](docs/media/demo.gif)
 
-Leave the server window open for scheduled checks. Closing it stops the site and
-its worker. This is a local address, not a public website URL.
+*Recorded from a local run using the app's built-in demo mode, which shows fictional
+example mics. Map tiles are from OpenStreetMap.*
 
-The admin password is checked on the server and never embedded in the frontend.
-No admin password is included in the repository. Set `ADMIN_PASSWORD` in your
-server environment or enter it at the local launcher prompt (at least 15 characters).
+## Overview
 
-## Public directory
+Open mic schedules in NYC are scattered across club websites, aggregator feeds and
+spreadsheets, and they go stale fast. This project consolidates them into one
+searchable, mobile-first directory. Sources are polled on a schedule, merged by
+priority, and flagged for review when they conflict or disappear, so a bad import
+never silently wipes out good data. Hosts can verify ownership of a mic and edit it
+directly, with every change scoped and audited.
 
-- Search mic names, venues, addresses, boroughs and neighborhoods.
-- Compact day and borough dropdowns update the map and the list together.
-- The directory fills one viewport. Multiple small rows are visible; Previous/Next
-  buttons reach further results without page scrolling or a scrolling list. The number
-  of rows adapts to the available height. The map shows all matching located mics.
-- Mic details use Mic, Notes and Sources tabs. Long notes and source lists have pages.
-- Filter by borough, entry fee and signup method. Purchase minimums remain separate.
-- Click a map pin for mic details. Nearby venues and sessions are grouped to prevent
-  overlapping pins; the popup lists each mic. Zoom in to separate nearby locations.
-- The map initially fits the five boroughs; borough labels remain visible at city scale.
-- Unmapped mics remain in the list. Cancelled/postponed mics have no active pin.
-- Saved mics are stored only in that browser. CSV export is available for real listings.
-- Source links, last-check timestamps, conflicts, stale warnings and curated edits are visible.
-- A checked source is not treated as a host confirmation.
+## Key features
 
-The background map uses OpenStreetMap tiles, with visible attribution and normal
-browser caching. No tiles are bundled or downloaded for offline use. Internet access
-is needed to display the map background. Pins and the list still work if tiles fail.
+**Public directory**
+- Search and filter by day, exact date (calendar), borough, fee, signup method and host status.
+- Five-borough map with grouped pins, a color legend and touch gestures (pinch, pan, double-tap).
+- Single-viewport layout that adapts its row count to the screen, from 320px phones to desktop.
+- Provenance on every listing: source links, last-checked time, conflicts and stale warnings.
+- Weekly, biweekly and one-time mics labeled; "Venue confirmed" for listings found on official club sites.
+- Saved mics (local to the browser) and CSV export.
 
-## Administration: /admin
+**Source ingestion**
+- Adapters for CSV, XLSX, JSON, HTML tables, JSON-LD events and CSS-selector card layouts.
+- Dedicated readers for Badslava, Comediq, Bushwick Comedy Club and a catalog of official club schedules.
+- Preview-before-publish imports, per-source refresh intervals, and priority-based conflict resolution.
+- Manual and host edits are preserved across syncs; failed imports keep the last good data.
+- Address geocoding via the US Census geocoder, with cached and clearly labeled approximate matches.
 
-The control room contains **Sources**, **Corrections**, **Claims**, **Host access**,
-**All mics**, and **Activity**.
+**Community and moderation**
+- Public "Submit a fix", "Report inactive" and "Submit a mic" flows with a private review queue.
+- Claim workflow: admin-verified claims issue single-use, seven-day host invitations.
+- Host dashboard scoped to approved mics only; claims carry forward to future dated occurrences.
+- Admin control room for sources, submissions, claims, host access, the audit log and About page copy.
+- Privacy-preserving visitor counts (hashed cookie, no IPs; honors DNT and GPC).
 
-### Sources
+## Screenshots
 
-Paste a public URL or upload `.xlsx`/CSV. Review the initial extraction before publishing.
-Supported input adapters are CSV, XLSX, JSON event arrays, HTML tables, event JSON-LD,
-and HTML cards configured with CSS selectors. Table column names can be mapped to
-standard fields. A source-wide default can fill genuinely shared fields such as borough.
+| Directory and map | Filtered to Brooklyn, $5 or less |
+| --- | --- |
+| ![Directory with list of mics beside a five-borough map with grouped pins](docs/media/directory-desktop.png) | ![Directory filtered to Brooklyn mics at $5 or less, with the active Filters indicator](docs/media/filters-desktop.png) |
+| **Mic details** | **Admin: preview before publishing** |
+| ![Mic detail dialog with schedule, signup, fee, stage time and claim actions](docs/media/mic-detail-desktop.png) | ![Admin import preview of examples/DEMO-mics.csv showing seven parsed listings before approval](docs/media/admin-import-preview.png) |
 
-- URL sources can refresh every 15, 30, 60, 180, 360, 720 or 1440 minutes.
-- Uploaded files are snapshots, not live connections to files on someone else's computer.
-- For ongoing spreadsheet updates, use a stable, accessible online XLSX or CSV URL.
-- For Google Sheets, use a published CSV export URL; this build does not implement private
-  Google Drive/OneDrive OAuth connections.
-- Sources can be paused, manually checked, reprioritized and removed.
-- Updates preserve manually/host-edited fields. Unedited fields continue syncing.
-- Failed or partial imports retain the last saved records and surface a review warning.
-- Missing rows are marked for review, not automatically declared cancelled or deleted.
-- Higher-priority sources supply the displayed value when sources disagree. Conflicts are shown.
-- Source checks honor robots rules and enforce request, redirect, size and public-network limits.
+<p align="center"><img src="docs/media/directory-phone.png" alt="Phone layout at 390px wide: filters, map and paginated list in one viewport" width="300"></p>
 
-**Not a universal scraper:** arbitrary prose, screenshots, Instagram, login-only pages,
-CAPTCHAs and JavaScript-only listings are not automatically parsed. They need an authorized
-structured feed or another adapter. No paywall or authentication bypass is included.
-The application does not infer unknown times, boroughs or complicated recurring schedules.
+## Tech stack
 
-Only connect sources you may access and reuse. Source URLs are visible to visitors.
-Do not place private credentials or sensitive query tokens in source URLs.
+| Layer | Technology |
+| --- | --- |
+| Backend | Python, FastAPI, uvicorn |
+| Data | PostgreSQL (psycopg 3) in production, SQLite for local or single-host deployments |
+| Ingestion | aiohttp, Beautiful Soup, openpyxl |
+| Frontend | Vanilla JavaScript, HTML and CSS; custom Web Mercator map over OpenStreetMap tiles |
+| Security | Server-side sessions, same-origin write checks, GitHub OIDC (PyJWT) for scheduled jobs |
+| Testing | pytest, Playwright (Chromium), GitHub Actions against PostgreSQL 16 |
+| Hosting | Vercel (serverless) or Docker |
 
-### Source fields
+## Engineering highlights
 
-Required: `name`, `venue`, `borough`, `start_time`, plus `weekday` or `date`.
-Optional: `id`, `address`, `neighborhood`, `signup_time`, `cost`, `purchase_minimum`,
-`set_minutes`, `signup_method`, `signup_url`, `notes`, `status`, `excluded_dates`,
-`latitude`, `longitude`.
+- **No framework, no map library.** The frontend is plain JavaScript, and `assets/map.js`
+  is a dependency-free Web Mercator renderer with pin clustering and anchored pinch zoom
+  that fetches only visible tiles.
+- **Defensive ingestion.** Source fetches honor robots rules and enforce request, redirect,
+  size and public-network limits. Missing rows are flagged for review rather than deleted,
+  and readers never guess times, boroughs or recurrence that the source does not state.
+- **Layered data model.** Raw source observations, priority-ranked merges and manual/host
+  overlays are stored separately, so edits survive re-syncs and imported values can be restored.
+- **Credential-free scheduling.** On Vercel, a GitHub Actions workflow triggers syncs using
+  short-lived OIDC tokens. The server pins the repository and owner IDs, branch, workflow
+  and event, so no long-lived secret lives in CI. A database lease prevents overlapping batches.
+- **Scoped, auditable access.** Invitation tokens and sessions are stored hashed, claim
+  links carry tokens in URL fragments to keep them out of access logs, host permissions are
+  checked on every write, and revocation is immediate.
+- **Dual database support.** The same code runs on PostgreSQL or SQLite, and CI exercises
+  storage-dependent tests against both.
 
-Use full weekday names. Dates must include a year. Times need an explicit format such
-as `7:00 PM` or `19:00`; a bare `7` is rejected. Monthly or alternating schedules must
-be provided as individual dates. Multiple sessions need distinct IDs.
-A stable source ID helps keep records attached when a title changes. A source changing
-its ID or weekly recurrence can require administrator reconciliation rather than a guessed merge.
+## Getting started
 
-`examples/open-mics-template.csv` is a blank import template. `examples/DEMO-mics.csv`
-is deliberately fictional test data, not an actual New York City schedule.
+### macOS one-click launcher
 
-### Fix submissions
-
-Every public listing has **Submit a fix**. No visitor account is required. Names,
-optional emails and evidence stay in the private review queue, not in the public API.
-
-Open the correction in `/admin`, edit the mic with the correct information, then mark
-it resolved. Rejection and review notes are also available. A free-text correction never
-silently changes the listing.
-
-### Claims and host accounts
-
-1. A visitor selects **Claim this mic**, supplies their name, email and evidence that they run it.
-2. You verify the claim in `/admin` and approve or reject it.
-3. Approval creates a one-use signup link, valid for seven days. **Copy and send it to the
-   verified host yourself. The app does not send email.**
-4. The host opens the link and creates an account with a password of at least 15 characters.
-5. Their account can edit only the mic you approved. Access is checked on every write.
-6. They return through `/owner`. An existing host can use another approved invitation
-   to attach a second mic to the same account after entering their current password.
-7. You can revoke access, hide the mic, edit it yourself, or restore imported values.
-
-The compact host dashboard has **Mic**, **When**, **Where**, and **Hosts** sections,
-a last-updated timestamp, and a public-listing link. Hosts can update names, fees,
-times, venue and pin details, notes, host names, social URLs, and signup links.
-Edits stay in the form when switching sections; **Save changes** publishes them.
-Hosts have separate passwords from the site administrator. **Password** requires
-their current password, accepts a new password of at least 15 characters, and
-signs out all their host sessions.
-
-For supported Badslava and Comediq feeds, an exact provider mic ID carries an active
-claim into later dated occurrences. New occurrences inherit persistent host details
-without copying one-date cancellations, date overrides, or skipped dates. Dates
-remain separately editable. Existing administrator edits are preserved. Ambiguous
-provider identities require review instead of automatically extending access.
-Revoking any occurrence removes the whole approved claim's recurring access while
-leaving separately approved mics alone.
-
-Invitation tokens and sessions are hashed in the database. Claim links put the token in
-an URL fragment so it is not included in ordinary HTTP access logs. Links are single-use;
-replacing or rejecting an invitation invalidates the old one. Revocation takes effect on
-the next edit request, even if the host still has a valid login session.
-
-Automatic email verification, automated invitation emails, and self-service password
-recovery are not implemented in this version. Admin verification of the claimant is essential.
-An audit trail records edits, approvals, rejection, visibility changes and revocations.
-
-### Map coordinates
-
-Sources can supply latitude/longitude. Otherwise, the worker attempts cached US Census
-street-address geocoding. Matches are approximate and labeled; ambiguous/no matches stay
-unmapped. The admin/host editor supports manual pin coordinates. Changing an address
-clears its old coordinates unless replacement coordinates are explicitly supplied.
-
-The geocoder uses a fixed government endpoint, not arbitrary user-provided URLs. It
-sends venue street addresses and boroughs, never claim evidence or contact information.
-
-## Deploy to Vercel
-
-The FastAPI entrypoint is `app/main.py`. `vercel.json` uses a 300-second function
-limit. Static assets are served from `/assets`; the app never writes a database to
-Vercel's temporary filesystem. Database initialization is deferred until the first
-request, so builds do not require a working database connection.
-
-1. Link this repository to a Vercel project.
-2. Connect a hosted PostgreSQL database (for example, Neon through Vercel Marketplace).
-   Set the pooled connection URL as **DATABASE_URL** in the production environment.
-   Use the provider's TLS-enabled URL; never commit it. `POSTGRES_URL` is also supported.
-3. Set **ADMIN_PASSWORD** to a unique password of at least 15 characters and
-   **LOCAL_DEV=0**. Set **PUBLIC_ORIGIN** to the actual production HTTPS origin.
-4. Set **GITHUB_SYNC_ENABLED=1**. Deploy and verify `/api/health` reports
-   `storage: postgresql` before connecting real sources.
-5. Put the verified production origin in `deployment.json` and commit it. The included
-   **Check mic sources** GitHub Actions workflow calls `/api/cron/sync` on a 15-minute
-   schedule. Until that URL is configured, the workflow deliberately makes no request.
-6. Run the workflow manually and check the source heartbeat in `/admin`.
-
-Scheduled requests use short-lived GitHub OIDC tokens. The server validates the issuer,
-audience, immutable repository/owner IDs, main branch, exact workflow, event and expiry.
-A fork or another workflow cannot trigger imports. No administrator password or long-lived
-site credential is stored in GitHub Actions. The scheduler has no access to host accounts.
-
-GitHub schedules can be delayed and are automatically disabled in public repositories
-after 60 days without repository activity; watch the heartbeat and re-enable the workflow
-if needed. This schedule avoids requiring sub-daily Vercel Cron on a paid hosting plan.
-Alternatively, a scheduler can send `Authorization: Bearer <CRON_SECRET>` to the same
-endpoint after setting a unique random **CRON_SECRET** of at least 32 characters.
-Do not add that secret to a URL, source file or public log.
-
-A database lease prevents overlapping scheduled batches across instances. Each batch is
-bounded to leave time before Vercel's function timeout. Sources not yet due are skipped;
-failed checks retain existing listings. Vercel does not start the always-running worker.
-The next scheduled batch continues pending sources and address geocoding.
-
-The real deployment, external source fetching and map tiles must still be verified on
-hosting. The site starts empty; fictional demo listings are never seeded automatically.
-
-### Persistent Python/Docker hosting
-
-SQLite remains supported for a single always-on process with persistent storage.
-Use `Dockerfile`, `compose.yaml` or the optional `render.yaml` blueprint, set a persistent
-**DATABASE_PATH**, **SCHEDULER_ENABLED=1**, **LOCAL_DEV=0**, **ADMIN_PASSWORD**, and the
-actual **PUBLIC_ORIGIN**. Serve behind HTTPS. Configure trusted proxy IPs only for your
-actual reverse proxy. `Start-Mic-List.command` remains available for local use.
-
-## Storage and backups
-
-PostgreSQL (Vercel) or SQLite (local/persistent hosting) keeps sources, observations,
-overlays, moderation submissions, accounts and the audit trail. The public directory is not a browser-only localStorage mockup.
-
-`/api/export` exports **source configurations and observations only**; it does not back up
-host accounts, claims or edits. Use `scripts/backup.py` for a full consistent SQLite backup:
+Requires Python 3.11+.
 
 ```bash
-python scripts/backup.py data/miclist.sqlite3 /private/backups/miclist.sqlite3
+bash Start-Mic-List.command   # or double-click it in Finder
 ```
 
-For PostgreSQL, use the database provider's backup/restore tools or `pg_dump` for a full backup.
+The script creates a virtual environment, installs dependencies, prompts for an admin
+password (at least 15 characters), and serves the site at `http://127.0.0.1:8000`.
+Sign in at `/admin`, add a source, preview the extracted listings and approve the import.
+The site starts empty; no demo data is seeded.
 
-Full backups contain private contact details and password hashes. Keep them confidential.
-Do not commit `.env`, `data/`, databases, backups or runtime sessions to a public repository.
+### Manual setup
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+export ADMIN_PASSWORD='choose-at-least-15-characters' LOCAL_DEV=1 SCHEDULER_ENABLED=1
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+```
+
+### Docker
+
+```bash
+ADMIN_PASSWORD='choose-at-least-15-characters' docker compose up --build
+```
+
+`compose.yaml` builds the image, stores SQLite on a named volume, and binds to
+`127.0.0.1:8000` for local use. See [`.env.example`](.env.example) for all settings.
 
 ## Testing
 
 ```bash
-python -m pip install -r requirements-dev.txt
-python -m pytest -q
-# Browser test: set CHROMIUM_PATH to your installed Chromium/Chrome executable.
-PYTHONPATH=. python tests/browser_checks.py
-python scripts/build_preview.py
-python tests/directory_layout_checks.py
+pip install -r requirements-dev.txt
+python -m pytest -q tests
 ```
 
-The backend suite also covers PostgreSQL persistence, transaction rollback, concurrent
-source leases, authenticated scheduled jobs and rejection of unauthorized GitHub identities.
-Set **TEST_DATABASE_URL** to a disposable PostgreSQL database to run storage-dependent
-tests against both engines. Each test creates and removes its own isolated schema.
-The included GitHub CI workflow runs this suite against PostgreSQL 16.
-Backend tests cover authentication, CSRF rejection, owner scoping, claim approval,
-single-use/expired invitations, account reuse, revoked access, hidden listings,
-private submission data, rate limits, snapshots, XLSX/CSV/HTML/JSON-LD parsing,
-source changes and failure retention, and server-side request restrictions.
+Set `TEST_DATABASE_URL` to a disposable PostgreSQL database to also run the suite
+against PostgreSQL. Playwright browser checks cover filtering, map grouping, nine
+viewport sizes, pagination, admin workflows and touch gestures. See
+[docs/testing.md](docs/testing.md) for the full test matrix.
 
-Browser checks cover all seven day filters, pin grouping and popups, nine viewport sizes
-(from 320×400 to 1440×900, including landscape), complete result pagination, saved
-filters, no directory/list scrolling, and compact details/filter dialogs, plus
-admin login/logout, tabs, manual mic creation and upload-form selection. They use an
-in-process API transport because localhost navigation is restricted in the build browser.
-This is not an assertion that public hosting, live source sites or map tiles were tested.
+## Project structure
 
-`preview.html` is a self-contained, read-only interface demonstration. Its fictional
-listings are never automatically seeded into the real database.
+```
+app/            FastAPI app: routes, auth, storage, scheduling, source adapters
+  main.py         entrypoint and core routes
+  community.py    submissions, claims, host accounts
+  parsers.py      generic CSV/XLSX/JSON/HTML adapters
+  badslava.py, comediq.py, bushwick.py, club_sources.py   source-specific readers
+assets/         static frontend (HTML, CSS, vanilla JS, map renderer)
+scripts/        backup, preview build, scheduled sync trigger
+tests/          pytest suite and Playwright browser checks
+examples/       CSV import template and fictional demo data
+docs/           administration, deployment, directory and testing guides; media/ holds README images
+```
 
-## Reference documentation
+## Deployment
 
-- OpenStreetMap tile policy: https://operations.osmfoundation.org/policies/tiles/
-- US Census geocoding API: https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html
-- Authentication guidance: https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
+Production runs on **Vercel** with hosted **PostgreSQL**, with source checks triggered
+every 15 minutes by an OIDC-authenticated GitHub Actions workflow. A **Docker** image
+(and an optional Render blueprint) supports always-on hosting with SQLite and an
+in-process scheduler. Step-by-step instructions, environment variables and backup
+procedures are in [docs/deployment.md](docs/deployment.md).
 
-### Mic submissions, moderation and About copy
+## Documentation
 
-The menu links to `/submit`. Hosts submit their mic and verification details without
-creating an account. A private, unguessable status link shows the administrator's
-decision. Approval publishes the listing and unlocks a seven-day, one-use password
-setup link. Contact information is private. No email service is configured: decisions
-appear on the status page, and the administrator can copy a setup link for direct sharing.
+- [Administration guide](docs/administration.md): sources, field schema, moderation, claims and host accounts
+- [Public directory](docs/directory.md): filters, map, gestures, visitor counts, shop
+- [Deployment and operations](docs/deployment.md): Vercel, Docker, environment, backups
+- [Testing](docs/testing.md): backend and browser test coverage
 
-Each listing offers **Report inactive**. Reports appear in the admin Reports tab and
-never hide anything automatically. Only an authenticated administrator can hide or
-restore listings. Missing source entries also remain published and appear under
-Sources for review; failed or ambiguous imports retain the saved data.
+## Author
 
-The **About page** admin tab edits page copy and the search/social description. Changes
-are stored in the database and safely rendered as plain text. The directory's Host
-status filter offers All mics, Host claimed and Unclaimed. **LAST SYNC AT** shows the
-latest successful online-source check in New York time, excluding manual additions.
+Built by **Taylor Drew** ([@taylordrew4u2](https://github.com/taylordrew4u2)).
 
-The Bushwick Comedy Club adapter reads its public `/open-mics` calendar, accepts only
-event titles explicitly containing “open mic”, and uses actual dated occurrences and
-venue coordinates. It does not assume weekly recurrence or infer performer fees.
-Only exact address/date/time matches join generic directory entries. Secret Pour's
-embedded private calendar is not connected.
-
-### Mobile map gestures
-
-The map supports one-finger dragging, two-finger pinch/pan, double-tap zoom, and
-existing zoom controls. Pinch zoom stays anchored between the fingers and uses
-integer OSM tile requests with fractional visual scaling. Dragging from a pin does
-not open it accidentally. Touch updates render at most once per animation frame.
-
-Coarse-pointer devices receive a brief vibration for map button actions and completed
-pinch zooms when `navigator.vibrate` is available. Unsupported browsers continue
-without vibration; reduced-motion preferences disable these pulses. Physical haptics
-depend on browser, hardware and device settings. No iOS vibration workaround is used.
-
-Run `python scripts/build_preview.py`, then
-`CHROMIUM_PATH=/path/to/chromium python tests/browser_map_gestures.py` for real
-Chromium touch-input checks. The test mocks vibration calls; it cannot verify a
-physical phone's vibration motor.
-
-### Public domain
-
-The public domain is `https://nycopenmicmasterlist.com`. Canonical page URLs, About
-structured data, the sitemap and robots sitemap reference use this domain. Connect
-it directly in Vercel Domains (registrar URL forwarding is not a custom-domain
-connection). The production server explicitly accepts the custom origin during
-migration from its configured Vercel origin; unrelated origins remain blocked. Set production `PUBLIC_ORIGIN=https://nycopenmicmasterlist.com`
-and redeploy. Verify host/admin sign-in and mic submissions on the custom domain.
-The scheduled source checker uses the same custom domain in `deployment.json`.
-
-### Visitor counts
-
-The main admin dashboard shows estimated unique browsers today, in the last seven
-and thirty New York calendar days (including today), and since tracking started.
-`/` and `/about` send one first-party count request per visible page load. A random
-HttpOnly, SameSite=Lax cookie lasts one year; only its SHA-256 hash, first-seen and
-last-seen timestamps are stored. No IPs, identities or page histories are stored.
-Signed-in admin/host browsers, obvious bot user agents, and browsers requesting
-Do Not Track or Global Privacy Control are excluded. Clearing
-cookies or using multiple devices can count a person more than once; these are
-approximate visitor counts, not authenticated people. No historical visits are
-backfilled. The counts use the existing database and no paid analytics service.
+No open-source license has been granted; all rights reserved.
