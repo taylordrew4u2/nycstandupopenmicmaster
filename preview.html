@@ -216,6 +216,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .mic-pin.confirmed-pin:not(.biweekly-pin){color:#277746!important}
 
 .calendar-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}.calendar-weekday{text-align:center;font-size:11px}.calendar-day{min-width:0;padding:10px 2px;border:1px solid var(--line);background:white;color:var(--ink)}.calendar-day[aria-current=date]{border:2px solid var(--red)}.calendar-day.selected{background:#dce9fa}
+
+/* Small public counter shares the menu corner without covering the map. */
+.corner-controls{display:grid;justify-items:end;flex:none;gap:1px;min-width:0}.visit-count{font:10px/1.2 Tahoma,Verdana,Arial,sans-serif;color:#eef5ff;white-space:nowrap;font-variant-numeric:tabular-nums}
 </style>
   
   
@@ -225,7 +228,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 <a class="skip-link" href="#main">Skip to mics</a>
 <header class="topbar"><div class="nav-inner">
   <div class="site-heading"><a href="/" class="wordmark" aria-label="NYC Open Mic Master List home"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20128%20128%22%3E%0A%3Ctitle%3ENYC%20Open%20Mic%20Master%20List%20map%20pin%20and%20microphone%3C/title%3E%0A%3Cpath%20fill%3D%22%232564B3%22%20d%3D%22M64%208C38%208%2020%2027%2020%2051c0%2030%2027%2055%2044%2073%2017-18%2044-43%2044-73C108%2027%2090%208%2064%208Z%22/%3E%0A%3Ccircle%20fill%3D%22%23FFFFFF%22%20cx%3D%2264%22%20cy%3D%2251%22%20r%3D%2220%22/%3E%0A%3Cpath%20fill%3D%22%23163A66%22%20d%3D%22M60%2038h8v20h-8zM53%2054h4c0%205%203%208%207%208s7-3%207-8h4c0%207-4%2012-9%2013v6h-4v-6c-5-1-9-6-9-13Z%22/%3E%0A%3C/svg%3E%0A" alt="" width="20" height="20"></a><span id="last-sync" class="last-sync" role="status">LAST SYNC AT —</span></div>
-  <details class="site-menu" id="site-menu"><summary>Menu</summary><nav aria-label="Site menu"><button data-action="calendar">Calendar</button><a href="/owner">Host sign in</a><a href="/submit">Submit a mic</a><a href="/about">About</a><a href="/shop">Shop</a></nav></details>
+  <div class="corner-controls"><details class="site-menu" id="site-menu"><summary>Menu</summary><nav aria-label="Site menu"><button data-action="calendar">Calendar</button><a href="/owner">Host sign in</a><a href="/submit">Submit a mic</a><a href="/about">About</a><a href="/shop">Shop</a></nav></details><span id="visit-count" class="visit-count" hidden></span></div>
 </div></header>
 <div id="preview-banner" class="preview-banner" hidden></div>
 <div class="status-strip" hidden><span id="directory-dot"></span><span id="directory-status"></span></div>
