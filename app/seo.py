@@ -96,6 +96,8 @@ def historical(row):
 
 def recurrence(row):
     frequency = row.get('frequency')
+    if frequency == 'non-weekly':
+        return 'Non-weekly · check schedule'
     if frequency == 'one-time':
         return 'Pop-up mic (not recurring)'
     if frequency == 'biweekly' or (not frequency and re.search(
@@ -231,7 +233,7 @@ def directory(rows, borough=None, page=1):
         body += '</nav>'
     body += '''<section aria-labelledby="listing-guide"><h2 id="listing-guide">Reading the listings</h2>
 <p><strong>Host claimed</strong> means an approved host can edit the listing. <strong>Venue confirmed</strong> means the mic appears on an official venue source; a host can still claim it. Neither label guarantees a mic will run.</p>
-<p><strong>Weekly</strong> mics repeat every week. <strong>Biweekly</strong> mics run every other week; check the confirmed date or source for the correct week. A <strong>pop-up mic</strong> is not recurring.</p>
+<p><strong>Weekly</strong> mics repeat every week. <strong>Biweekly</strong> mics run every other week; check the confirmed date or source for the correct week. <strong>Non-weekly</strong> mics have an irregular or unconfirmed cadence; check the source for dates. A <strong>pop-up mic</strong> is not recurring.</p>
 <p>Times are in New York time. Check each listing’s last update, entry fee, and source before traveling. Cancelled or postponed listings are labeled, and outdated listings can be reported from the mic finder.</p></section>'''
     return page_html(title, description, path, body, graph, noindex=not selected)
 
@@ -263,6 +265,8 @@ def mic_detail(row):
         fields.append(('Purchase minimum', row['purchase_minimum']))
     if recurrence(row).startswith('Biweekly'):
         fields.append(('Confirmed alternate-week date', date_label(row.get('recurrence_anchor')) if valid_date(row.get('recurrence_anchor')) else 'Not listed; confirm the week with the host or venue'))
+    if row.get('frequency') == 'non-weekly' and (not valid_date(row.get('date')) or generated_source_date(row)):
+        fields.append(('Confirmed dates', 'Not listed; check the mic’s schedule before going'))
     if row.get('excluded_dates'):
         fields.append(('Does not run on', '; '.join(date_label(value) for value in row['excluded_dates'] if valid_date(value))))
     body = f'<h1>{esc(row.get("name"))}</h1><p><a href="/?mic={quote(str(row["id"]), safe="")}">Open this mic in the map finder</a></p>'

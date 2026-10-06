@@ -274,8 +274,8 @@ def normalize_rows(raw_rows, config):
             if minutes is not None and not 1 <= minutes <= 90:
                 minutes = None
             frequency = clean(mapped['frequency']).lower()
-            if frequency not in ('', 'weekly', 'biweekly', 'one-time'):
-                raise ValueError('frequency must be weekly, biweekly, or one-time')
+            if frequency not in ('', 'weekly', 'biweekly', 'non-weekly', 'one-time'):
+                raise ValueError('frequency must be weekly, biweekly, non-weekly, or one-time')
             if frequency == 'one-time' and not event_date:
                 raise ValueError('a one-time mic requires an event date')
             anchor = parse_date(mapped['recurrence_anchor'])

@@ -64,6 +64,8 @@ function occursOnDate(row,date){
   if((row.excluded_dates||[]).includes(date))return false;
   const generatedDate=generatedSourceDate(row);
   if(row.date&&!generatedDate)return row.date===date;
+  // A non-weekly listing without confirmed dates is discoverable by weekday, not a dated occurrence.
+  if(row.frequency==='non-weekly')return false;
   if(!Number.isInteger(row.weekday)||row.weekday!==weekday(date))return false;
   if(isBiweekly(row)&&row.recurrence_anchor){const diff=Math.round((new Date(date+'T12:00:00Z')-new Date(row.recurrence_anchor+'T12:00:00Z'))/86400000);return diff>=0&&diff%14===0;}
   // Unknown alternate-week anchors stay visible rather than silently dropping a mic.
@@ -75,7 +77,7 @@ function renderCalendar(offset=0){
   const year=month.getUTCFullYear(),m=month.getUTCMonth(),count=new Date(Date.UTC(year,m+1,0)).getUTCDate(),start=(month.getUTCDay()+6)%7;
   let cells=DAYS.map(d=>`<span class="calendar-weekday">${d.slice(0,3)}</span>`).join('')+'<span></span>'.repeat(start);
   for(let day=1;day<=count;day++){const date=`${year}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;cells+=`<button class="calendar-day ${date===state.date?'selected':''}" data-action="calendar-date" data-id="${date}" aria-label="View mics for ${date}" ${date===nyToday()?'aria-current="date"':''}>${day}</button>`;}
-  modal('Calendar',`<div class="calendar-heading">${button('←','calendar-prev')}<strong>${month.toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'})}</strong>${button('→','calendar-next')}</div><div class="calendar-grid">${cells}</div><p class="form-helper">Choose a date to view mics. Biweekly mics with unconfirmed dates remain visible; check their details.</p>`,button('Today','calendar-date',nyToday())+button('All dates','calendar-clear'));
+  modal('Calendar',`<div class="calendar-heading">${button('←','calendar-prev')}<strong>${month.toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'})}</strong>${button('→','calendar-next')}</div><div class="calendar-grid">${cells}</div><p class="form-helper">Choose a date to view mics. Biweekly mics with unconfirmed dates remain visible; check their details. Non-weekly mics without dates are available under All dates or a weekday.</p>`,button('Today','calendar-date',nyToday())+button('All dates','calendar-clear'));
 }
 
 function occurs(row){
@@ -86,6 +88,7 @@ function occurs(row){
   return dated?weekday(row.date)===Number(state.day):row.weekday===Number(state.day);
 }
 function nextDate(row){
+  if(row.frequency==='non-weekly'&&(!row.date||generatedSourceDate(row)))return '9999-12-31';
   if(state.date)return state.date;
   if(row.date&&!generatedSourceDate(row))return row.date;
   if(!Number.isInteger(row.weekday))return '9999-12-31';
@@ -96,7 +99,12 @@ function nextDate(row){
 }
 const claimLabel=r=>r.claimed?'Host claimed':r.venue_confirmed?'Venue confirmed':'Unclaimed';
 const claimBadge=r=>`<span class="claim-status ${r.claimed||r.venue_confirmed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':r.venue_confirmed?'Listed on an official venue website. A host can still claim this mic.':'No approved host has claimed this mic.'}">${claimLabel(r)}</span>`;
-function scheduleLabel(r){if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||generatedSourceDate(r)||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
+function scheduleLabel(r){if(r.frequency==='non-weekly')return 'Non-weekly · check schedule';if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||generatedSourceDate(r)||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
+const datesUnconfirmed=r=>(r.frequency==='non-weekly'||(isBiweekly(r)&&!r.recurrence_anchor))&&(!r.date||generatedSourceDate(r));
+function scheduleDay(r,long=false){
+  if(datesUnconfirmed(r))return long?(DAYS[r.weekday]||'Day not listed')+' · dates unconfirmed':'Dates unconfirmed';
+  return new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:long?'long':'short',month:'short',day:'numeric',timeZone:'UTC'});
+}
 const scheduleBadge=r=>`<span class="${isBiweekly(r)?'biweekly-badge':'schedule-badge'}">${scheduleLabel(r)}</span>`;
 const micTitle=r=>r.name;
 const updatedAt=r=>Math.max(r.updated_at||0,r.curated_at||0);
@@ -126,7 +134,7 @@ function biweeklyThisWeek(r){
   return null;
 }
 function recurrenceFields(r){
-  return '<div class="form-row">'+selectField('Schedule','frequency',[['weekly','Weekly'],['biweekly','Biweekly (every other week)'],['one-time','Pop-up mic (not recurring)']],r.frequency||(isBiweekly(r)?'biweekly':r.date&&!generatedSourceDate(r)?'one-time':'weekly'))+field('Confirmed biweekly date','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
+  return '<div class="form-row">'+selectField('Schedule','frequency',[['weekly','Weekly'],['biweekly','Biweekly (every other week)'],['non-weekly','Non-weekly · check schedule'],['one-time','Pop-up mic (not recurring)']],r.frequency||(isBiweekly(r)?'biweekly':r.date&&!generatedSourceDate(r)?'one-time':'weekly'))+field('Confirmed biweekly date','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
 }
 function syncScheduleForm(form,changed=false){
   if(!form)return;const frequency=$('[name=frequency]',form)?.value;if(!frequency)return;
@@ -180,7 +188,7 @@ function card(r){
   const cost=r.cost===0?'Free':r.cost!=null?`$${r.cost}`:r.cost_text?'See fee':'—';
   const located=r.status==='scheduled'&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);
   const title=micTitle(r),venue=`${r.venue} · ${r.borough}`;
-  return `<article class="mic-card ${isBiweekly(r)?'biweekly-mic':''}" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):esc(isBiweekly(r)&&!r.date&&!r.recurrence_anchor?'Dates unconfirmed':new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'}))}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button></div><div class="mic-meta">${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}${scheduleBadge(r)}${claimBadge(r)}</div><small class="row-updated" title="${updatedAt(r)?esc(new Date(updatedAt(r)*1000).toLocaleString()):'Not recorded'}">Updated ${esc(updatedText(r))}</small></div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
+  return `<article class="mic-card ${isBiweekly(r)?'biweekly-mic':''}" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):esc(scheduleDay(r))}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button></div><div class="mic-meta">${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}${scheduleBadge(r)}${claimBadge(r)}</div><small class="row-updated" title="${updatedAt(r)?esc(new Date(updatedAt(r)*1000).toLocaleString()):'Not recorded'}">Updated ${esc(updatedText(r))}</small></div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
 }
 function filtersDialog(){
   const option=(v,t,current)=>`<option value="${v}" ${current===v?'selected':''}>${t}</option>`;
@@ -193,7 +201,7 @@ function details(id,tab='mic',page=0){
   const tabs=['mic','hosts','notes','sources','link'].map(t=>`<button class="compact-button ${tab===t?'active':''}" data-action="detail-tab" data-id="${esc(id)}" data-tab="${t}" aria-pressed="${tab===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
   let body='';
   if(tab==='mic'){
-    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('REPEATS',scheduleLabel(r)+(isBiweekly(r)?' · '+(biweeklyThisWeek(r)===null?'dates unconfirmed':biweeklyThisWeek(r)?'on this week':'off this week'):''))}${item('WHEN',`${isBiweekly(r)&&!r.date&&!r.recurrence_anchor?DAYS[r.weekday]+' · dates unconfirmed':new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',timeZone:'UTC'})} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('STATUS',r.status+' · '+claimLabel(r))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?(badslava\.com|comediq\.us)\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
+    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('REPEATS',scheduleLabel(r)+(isBiweekly(r)?' · '+(biweeklyThisWeek(r)===null?'dates unconfirmed':biweeklyThisWeek(r)?'on this week':'off this week'):''))}${item('WHEN',`${scheduleDay(r,true)} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('STATUS',r.status+' · '+claimLabel(r))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?(badslava\.com|comediq\.us)\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
   }else if(tab==='hosts'){
     const links=String(r.host_socials||'').split(/\s+/).filter(Boolean);
     body=`<p>${esc(r.host_names||'Host not listed')}</p><div class="host-links">${links.map(u=>external(u,new URL(safeUrl(u)||'https://example.com').hostname.replace('www.',''),'button quiet')).join('')}</div><p class="form-helper">${r.claimed?'An approved host can update these details.':'Host details are from the source unless a host claims this mic.'}</p>`;

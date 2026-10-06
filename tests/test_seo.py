@@ -201,3 +201,13 @@ def test_empty_sitemap_has_no_empty_landing_pages():
     xml = seo.sitemap_xml([]).decode()
     assert '/nyc-comedy-open-mics' not in xml
     assert '/open-mics/' not in xml
+
+
+def test_nonweekly_schedule_does_not_claim_weekly_or_create_occurrences():
+    row = listing(frequency='non-weekly', notes='Non-weekly; dates to be confirmed.')
+    assert seo.recurrence(row) == 'Non-weekly · check schedule'
+    assert seo.schedule(row) == 'Monday at 7:30 PM · Non-weekly · check schedule'
+    content = seo.mic_detail(row)
+    assert 'Confirmed dates' in content and 'check the mic’s schedule before going' in content
+    assert '/?date=' not in content
+    assert '"startDate"' not in content

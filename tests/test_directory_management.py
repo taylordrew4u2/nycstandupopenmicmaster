@@ -215,7 +215,7 @@ def test_claim_private_status_unlocks_without_manual_link(clients):
 
 
 @pytest.mark.parametrize('frequency,date,anchor',[
-    ('weekly','',''),('biweekly','','2026-09-30'),('one-time','2026-10-07','')
+    ('weekly','',''),('biweekly','','2026-09-30'),('non-weekly','',''),('one-time','2026-10-07','')
 ])
 def test_submission_schedule_choices(clients,frequency,date,anchor):
     app,admin,visitor=clients

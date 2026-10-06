@@ -1,0 +1,812 @@
+[
+  {
+    "image_filename": "IMG_6364.jpeg",
+    "name": "Creep Mic",
+    "venue": "Pete's Candy Store",
+    "weekday": 6,
+    "start_time": "15:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6364.jpeg",
+    "name": "C Sweet Comedy",
+    "venue": "Phoenix Bar",
+    "weekday": 6,
+    "start_time": "16:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6364.jpeg",
+    "name": "Sunday Scaries",
+    "venue": "Flophouse",
+    "weekday": 6,
+    "start_time": "16:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6364.jpeg",
+    "name": "Community Service",
+    "venue": "Brooklyn Art Haus",
+    "weekday": 6,
+    "start_time": "17:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6364.jpeg",
+    "name": "Crush Comedy",
+    "venue": "Easy Lover",
+    "weekday": 6,
+    "start_time": "18:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6364.jpeg",
+    "name": "The Teeny Tiny Mic",
+    "venue": "Easy Lover",
+    "weekday": 6,
+    "start_time": "20:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6364.jpeg",
+    "name": "Bob and Sam Mic",
+    "venue": "Easy Lover",
+    "weekday": 6,
+    "start_time": "20:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6364.jpeg",
+    "name": "Punching Bag",
+    "venue": "O'Keefe's",
+    "weekday": 6,
+    "start_time": "20:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6364.jpeg",
+    "name": "B.Y.O.T.",
+    "venue": "UCB",
+    "weekday": 6,
+    "start_time": "21:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6362.jpeg",
+    "name": "Loose Lips",
+    "venue": "Pete's Candy Store",
+    "weekday": 5,
+    "start_time": "15:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6362.jpeg",
+    "name": "The Mic",
+    "venue": "The Improv",
+    "weekday": 5,
+    "start_time": "15:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6362.jpeg",
+    "name": "Listen Up Queers!",
+    "venue": "Flophouse",
+    "weekday": 5,
+    "start_time": "16:30",
+    "non_weekly": false,
+    "notes": "Queer and allies."
+  },
+  {
+    "image_filename": "IMG_6362.jpeg",
+    "name": "Feelings Anonymous",
+    "venue": "Easy Lover",
+    "weekday": 5,
+    "start_time": "17:30",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Laughing Friends",
+    "venue": "Starr Bar",
+    "weekday": 2,
+    "start_time": "17:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "The Secret Mic",
+    "venue": "NY Comedy Club EV",
+    "weekday": 2,
+    "start_time": "17:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Greenpoint Comedy Club",
+    "venue": "Greenpoint Comedy Club",
+    "weekday": 2,
+    "start_time": "17:30",
+    "non_weekly": false,
+    "notes": "Image supplies the venue name without a separate mic title."
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Energizer Honeys",
+    "venue": "Starr Bar",
+    "weekday": 2,
+    "start_time": "17:30",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Teachers Lounge",
+    "venue": "Halyards",
+    "weekday": 2,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "The Champs",
+    "venue": "Pinebox",
+    "weekday": 2,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Finite Jest",
+    "venue": "Flophouse",
+    "weekday": 2,
+    "start_time": "18:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "So Chill",
+    "venue": "Whisk & Whiskey",
+    "weekday": 2,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Freddy's Mic",
+    "venue": "Freddy's",
+    "weekday": 2,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Wednesdays at Suite",
+    "venue": "Suite",
+    "weekday": 2,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Death to All of Them",
+    "venue": "Telephone Room",
+    "weekday": 2,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": "Women and LGBTQ."
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Sick Hat",
+    "venue": "Cobra Club",
+    "weekday": 2,
+    "start_time": "20:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "The Mic About Ideas",
+    "venue": "Cobra Club",
+    "weekday": 2,
+    "start_time": "20:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Ugh, I'm Already Crying",
+    "venue": "Easy Lover",
+    "weekday": 2,
+    "start_time": "20:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Cuckoo's",
+    "venue": "Soho Playhouse",
+    "weekday": 2,
+    "start_time": "22:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "Greek Yogurt",
+    "venue": "Grove34",
+    "weekday": 2,
+    "start_time": "22:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6359.jpeg",
+    "name": "The Late Night Mic",
+    "venue": "Halyards",
+    "weekday": 2,
+    "start_time": "22:30",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Manhattan Mic",
+    "venue": "Greenpoint Comedy Club",
+    "weekday": 3,
+    "start_time": "17:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Foolery/Jestermaxxing",
+    "venue": "Pinebox Rock Shop",
+    "weekday": 3,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Noise Complaint",
+    "venue": "Halyards",
+    "weekday": 3,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Jester's Privilege",
+    "venue": "Telephone",
+    "weekday": 3,
+    "start_time": "18:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Some Good Comedy",
+    "venue": "Flophouse",
+    "weekday": 3,
+    "start_time": "18:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Backyard Baseball",
+    "venue": "Easy Lover",
+    "weekday": 3,
+    "start_time": "19:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Taylor Drew Review",
+    "venue": "Secret Pour",
+    "weekday": 3,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Pizzagator",
+    "venue": "Alligator Lounge",
+    "weekday": 3,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Raw Charisma",
+    "venue": "Easy Lover",
+    "weekday": 3,
+    "start_time": "19:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Nice Girls",
+    "venue": "UCB",
+    "weekday": 3,
+    "start_time": "19:30",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Thursdays at the Rib",
+    "venue": "Island Ribhouse",
+    "weekday": 3,
+    "start_time": "19:30",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Pop Shop",
+    "venue": "Cool Beans Coffee",
+    "weekday": 3,
+    "start_time": "20:00",
+    "non_weekly": false,
+    "notes": "Queens."
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Slander Factory",
+    "venue": "Talon Bar",
+    "weekday": 3,
+    "start_time": "21:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6360.jpeg",
+    "name": "Girls Night Mic",
+    "venue": "Flophouse",
+    "weekday": 3,
+    "start_time": "23:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6361.jpeg",
+    "name": "Numbskull",
+    "venue": "Pete's Candy Store",
+    "weekday": 4,
+    "start_time": "17:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6361.jpeg",
+    "name": "Greenpoint Comedy Club",
+    "venue": "Greenpoint Comedy Club",
+    "weekday": 4,
+    "start_time": "17:30",
+    "non_weekly": false,
+    "notes": "Image supplies the venue name without a separate mic title."
+  },
+  {
+    "image_filename": "IMG_6361.jpeg",
+    "name": "Deadass",
+    "venue": "Pine Box",
+    "weekday": 4,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6361.jpeg",
+    "name": "Friday Mic",
+    "venue": "Halyards",
+    "weekday": 4,
+    "start_time": "18:20",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6361.jpeg",
+    "name": "Mr. Owl Presents",
+    "venue": "Telephone Room",
+    "weekday": 4,
+    "start_time": "18:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6361.jpeg",
+    "name": "Pure Chaos",
+    "venue": "Flophouse",
+    "weekday": 4,
+    "start_time": "18:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6361.jpeg",
+    "name": "Summer Fridays",
+    "venue": "Ruhani Cafe",
+    "weekday": 4,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": "Weather permitting."
+  },
+  {
+    "image_filename": "IMG_6361.jpeg",
+    "name": "Get It Goin'",
+    "venue": "Eastville",
+    "weekday": 4,
+    "start_time": "23:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Breakfast of Champions",
+    "venue": "Telephone",
+    "weekday": 1,
+    "start_time": "13:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "The Goated Mic",
+    "venue": "The PIT",
+    "weekday": 1,
+    "start_time": "17:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Clay Ones",
+    "venue": "Young Ethels",
+    "weekday": 1,
+    "start_time": "17:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Greenpoint Comedy Club",
+    "venue": "Greenpoint Comedy Club",
+    "weekday": 1,
+    "start_time": "17:30",
+    "non_weekly": false,
+    "notes": "Image supplies the venue name without a separate mic title."
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "We Wear Pink",
+    "venue": "Westside Comedy Club",
+    "weekday": 1,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": "LGBTQ and women."
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Tammany Hall",
+    "venue": "Halyards",
+    "weekday": 1,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "No Ragrets",
+    "venue": "Eastville",
+    "weekday": 1,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Jeans and a Nice Top",
+    "venue": "Pine Box",
+    "weekday": 1,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "ADHD",
+    "venue": "Commune",
+    "weekday": 1,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Yikes",
+    "venue": "Flophouse",
+    "weekday": 1,
+    "start_time": "18:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Flopsauce",
+    "venue": "Secret Pour",
+    "weekday": 1,
+    "start_time": "19:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Pure Chaos",
+    "venue": "Alphaville",
+    "weekday": 1,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "On the Wagon",
+    "venue": "Social Club",
+    "weekday": 1,
+    "start_time": "19:30",
+    "non_weekly": false,
+    "notes": "Sober."
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Greenpoint Comedy Club",
+    "venue": "Greenpoint Comedy Club",
+    "weekday": 1,
+    "start_time": "19:30",
+    "non_weekly": false,
+    "notes": "Image supplies the venue name without a separate mic title."
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Peer Pressure",
+    "venue": "Block Hill Station",
+    "weekday": 1,
+    "start_time": "20:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Bob and Sam",
+    "venue": "Branded Saloon",
+    "weekday": 1,
+    "start_time": "20:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Sanger Hall",
+    "venue": "Sanger Hall",
+    "weekday": 1,
+    "start_time": "20:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule. Queens."
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Hot Mic",
+    "venue": "Somebody's Darling",
+    "weekday": 1,
+    "start_time": "20:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Eiffel Tower",
+    "venue": "BCC/Eris",
+    "weekday": 1,
+    "start_time": "20:30",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Status",
+    "venue": "Secret Pour",
+    "weekday": 1,
+    "start_time": "21:00",
+    "non_weekly": true,
+    "notes": "Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6358.jpeg",
+    "name": "Franzia",
+    "venue": "Nostrand Avenue Pub",
+    "weekday": 1,
+    "start_time": "21:00",
+    "non_weekly": false,
+    "notes": ""
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Pillow Fight",
+    "venue": "Pinebox",
+    "weekday": 0,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Phoenix Bar",
+    "venue": "Phoenix Bar",
+    "weekday": 0,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Cat Salad",
+    "venue": "Commune",
+    "weekday": 0,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Behavior",
+    "venue": "Echo Bravo",
+    "weekday": 0,
+    "start_time": "18:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Rant",
+    "venue": "Mood Ring",
+    "weekday": 0,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday. LGBTQ and women."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Garfield: The Mic",
+    "venue": "Secret Pour",
+    "weekday": 0,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Femmes and Friends",
+    "venue": "Suite Bar",
+    "weekday": 0,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Fun Mic",
+    "venue": "Freddy's",
+    "weekday": 0,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Yard Sale",
+    "venue": "Alphaville",
+    "weekday": 0,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Easy Paradise",
+    "venue": "KGB Bar Red Room",
+    "weekday": 0,
+    "start_time": "19:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Golden Hour",
+    "venue": "Social House Cafe",
+    "weekday": 0,
+    "start_time": "19:00",
+    "non_weekly": true,
+    "notes": "Day inferred from seven-day image set; verify Monday. Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Skin Tag",
+    "venue": "McCarren Parkhouse",
+    "weekday": 0,
+    "start_time": "19:15",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "We're All Friends Here",
+    "venue": "Cobra Club",
+    "weekday": 0,
+    "start_time": "19:30",
+    "non_weekly": true,
+    "notes": "Day inferred from seven-day image set; verify Monday. Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "DIGIII",
+    "venue": "Crystal Lake",
+    "weekday": 0,
+    "start_time": "19:30",
+    "non_weekly": true,
+    "notes": "Day inferred from seven-day image set; verify Monday. Non-weekly; check mic's page for schedule."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Freak Latte",
+    "venue": "Good Judy",
+    "weekday": 0,
+    "start_time": "20:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Antidepressant Mic",
+    "venue": "PubKey",
+    "weekday": 0,
+    "start_time": "20:30",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  },
+  {
+    "image_filename": "IMG_6356.jpeg",
+    "name": "Doodle Mic",
+    "venue": "Young Ethels",
+    "weekday": 0,
+    "start_time": "22:00",
+    "non_weekly": false,
+    "notes": "Day inferred from seven-day image set; verify Monday."
+  }
+]

@@ -4,13 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#245da7">
-  <meta name="description" content="Find NYC stand up comedy open mics by day, time, and borough. Browse the map, venue details, host links, and listing updates.">
+  <meta name="description" content="Find New York City stand-up comedy open mics by date, weekday, time and borough. Browse venue locations, host and venue confirmation, and listing updates.">
   <link rel="canonical" href="https://nycopenmicmasterlist.com/">
-  <meta property="og:title" content="NYC Open Mic Master List">
-  <meta property="og:description" content="Find NYC comedy open mics by day, time, and borough. Map, host details, and visible updates.">
+  <meta property="og:title" content="NYC Comedy Open Mics | NYC Open Mic Master List">
+  <meta property="og:description" content="Find New York City stand-up comedy open mics by date, weekday, time and borough. Map, venue details and listing updates.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://nycopenmicmasterlist.com/">
-  <title>NYC Open Mic Master List</title>
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="twitter:card" content="summary">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","@id":"https://nycopenmicmasterlist.com/#website","name":"NYC Open Mic Master List","url":"https://nycopenmicmasterlist.com/","description":"Find New York City stand-up comedy open mics by date, time and borough.","inLanguage":"en-US","about":{"@type":"Thing","name":"New York City stand-up comedy open mics"}}</script>
+  <title>NYC Comedy Open Mics | NYC Open Mic Master List</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20128%20128%22%3E%0A%3Ctitle%3ENYC%20Open%20Mic%20Master%20List%20map%20pin%20and%20microphone%3C/title%3E%0A%3Cpath%20fill%3D%22%232564B3%22%20d%3D%22M64%208C38%208%2020%2027%2020%2051c0%2030%2027%2055%2044%2073%2017-18%2044-43%2044-73C108%2027%2090%208%2064%208Z%22/%3E%0A%3Ccircle%20fill%3D%22%23FFFFFF%22%20cx%3D%2264%22%20cy%3D%2251%22%20r%3D%2220%22/%3E%0A%3Cpath%20fill%3D%22%23163A66%22%20d%3D%22M60%2038h8v20h-8zM53%2054h4c0%205%203%208%207%208s7-3%207-8h4c0%207-4%2012-9%2013v6h-4v-6c-5-1-9-6-9-13Z%22/%3E%0A%3C/svg%3E%0A" type="image/svg+xml">
   <style>:root{--paper:#f6f5ef;--white:#fffefa;--ink:#232620;--muted:#686d62;--line:#dedfd6;--red:#b93529;--light-red:#f2e7df;--green:#3d6850;--radius:9px;--sans:Arial,Helvetica,sans-serif;--mono:'Courier New',monospace}
 *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:25px}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased}button,input,select,textarea{font:inherit}button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}button,a{touch-action:manipulation}button{cursor:pointer}a{color:inherit;text-decoration:none}button:disabled{opacity:.5;cursor:not-allowed}button{color:inherit}input,select,textarea{color:var(--ink);max-width:100%}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #b93529;outline-offset:4px}input,textarea,select{border:1px solid var(--line);border-radius:6px;background:var(--white);padding:12px;width:100%}input[type=checkbox]{width:17px;height:17px;accent-color:var(--red)}input[type=file]{padding:16px;border-style:dashed}select{cursor:pointer}p{line-height:1.65;margin:0}h1,h2,h3,h4{margin:0}h2{font-size:31px;letter-spacing:-1px;font-weight:750}h3{font-size:16px}em{font-style:normal}small{font-size:12px}.wrap{max-width:1232px;width:calc(100% - 88px);margin:0 auto}.preview-banner{background:#ebe4c9;color:#5d4b26;text-align:center;padding:10px 20px;font-size:12px;font-weight:600;line-height:1.5}.preview-banner button{background:none;border:0;text-decoration:underline;margin-left:12px;font-weight:700;color:inherit}.topbar{background:var(--ink);color:var(--paper)}.nav-inner{max-width:1232px;width:calc(100% - 88px);margin:auto;display:flex;align-items:center;justify-content:space-between;min-height:90px;gap:30px}.wordmark{display:flex;align-items:center;gap:12px;font-size:26px;letter-spacing:-1px;font-weight:900;line-height:1}.brand-icon{display:grid;place-items:center;background:var(--red);color:var(--paper);width:40px;height:42px;font-size:32px;line-height:1}.brand-sub{display:block;font-family:var(--mono);font-size:9px;letter-spacing:2.6px;line-height:2.2}.topbar nav{display:flex;align-items:center;gap:30px;margin-left:auto;margin-right:auto}.nav-link{background:none;color:#c3c5bc;border:0;padding:33px 0;font-size:12px;font-weight:600;white-space:nowrap;position:relative}.nav-link.active{color:var(--white)}.nav-link.active:after{position:absolute;bottom:0;left:0;right:0;content:'';height:3px;background:var(--red)}.nav-link:hover{color:white}#saved-count{font-size:10px;background:#3c3f39;padding:2px 5px;border-radius:3px;margin-left:4px}.tiny-lock{margin-left:7px}.edition{font:10px/1.6 var(--mono);letter-spacing:1.2px;color:#b4b7ad}
@@ -501,6 +504,8 @@ function occursOnDate(row,date){
   if((row.excluded_dates||[]).includes(date))return false;
   const generatedDate=generatedSourceDate(row);
   if(row.date&&!generatedDate)return row.date===date;
+  // A non-weekly listing without confirmed dates is discoverable by weekday, not a dated occurrence.
+  if(row.frequency==='non-weekly')return false;
   if(!Number.isInteger(row.weekday)||row.weekday!==weekday(date))return false;
   if(isBiweekly(row)&&row.recurrence_anchor){const diff=Math.round((new Date(date+'T12:00:00Z')-new Date(row.recurrence_anchor+'T12:00:00Z'))/86400000);return diff>=0&&diff%14===0;}
   // Unknown alternate-week anchors stay visible rather than silently dropping a mic.
@@ -512,7 +517,7 @@ function renderCalendar(offset=0){
   const year=month.getUTCFullYear(),m=month.getUTCMonth(),count=new Date(Date.UTC(year,m+1,0)).getUTCDate(),start=(month.getUTCDay()+6)%7;
   let cells=DAYS.map(d=>`<span class="calendar-weekday">${d.slice(0,3)}</span>`).join('')+'<span></span>'.repeat(start);
   for(let day=1;day<=count;day++){const date=`${year}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;cells+=`<button class="calendar-day ${date===state.date?'selected':''}" data-action="calendar-date" data-id="${date}" aria-label="View mics for ${date}" ${date===nyToday()?'aria-current="date"':''}>${day}</button>`;}
-  modal('Calendar',`<div class="calendar-heading">${button('←','calendar-prev')}<strong>${month.toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'})}</strong>${button('→','calendar-next')}</div><div class="calendar-grid">${cells}</div><p class="form-helper">Choose a date to view mics. Biweekly mics with unconfirmed dates remain visible; check their details.</p>`,button('Today','calendar-date',nyToday())+button('All dates','calendar-clear'));
+  modal('Calendar',`<div class="calendar-heading">${button('←','calendar-prev')}<strong>${month.toLocaleDateString('en-US',{month:'long',year:'numeric',timeZone:'UTC'})}</strong>${button('→','calendar-next')}</div><div class="calendar-grid">${cells}</div><p class="form-helper">Choose a date to view mics. Biweekly mics with unconfirmed dates remain visible; check their details. Non-weekly mics without dates are available under All dates or a weekday.</p>`,button('Today','calendar-date',nyToday())+button('All dates','calendar-clear'));
 }
 
 function occurs(row){
@@ -523,6 +528,7 @@ function occurs(row){
   return dated?weekday(row.date)===Number(state.day):row.weekday===Number(state.day);
 }
 function nextDate(row){
+  if(row.frequency==='non-weekly'&&(!row.date||generatedSourceDate(row)))return '9999-12-31';
   if(state.date)return state.date;
   if(row.date&&!generatedSourceDate(row))return row.date;
   if(!Number.isInteger(row.weekday))return '9999-12-31';
@@ -533,7 +539,12 @@ function nextDate(row){
 }
 const claimLabel=r=>r.claimed?'Host claimed':r.venue_confirmed?'Venue confirmed':'Unclaimed';
 const claimBadge=r=>`<span class="claim-status ${r.claimed||r.venue_confirmed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':r.venue_confirmed?'Listed on an official venue website. A host can still claim this mic.':'No approved host has claimed this mic.'}">${claimLabel(r)}</span>`;
-function scheduleLabel(r){if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||generatedSourceDate(r)||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
+function scheduleLabel(r){if(r.frequency==='non-weekly')return 'Non-weekly · check schedule';if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||generatedSourceDate(r)||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
+const datesUnconfirmed=r=>(r.frequency==='non-weekly'||(isBiweekly(r)&&!r.recurrence_anchor))&&(!r.date||generatedSourceDate(r));
+function scheduleDay(r,long=false){
+  if(datesUnconfirmed(r))return long?(DAYS[r.weekday]||'Day not listed')+' · dates unconfirmed':'Dates unconfirmed';
+  return new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:long?'long':'short',month:'short',day:'numeric',timeZone:'UTC'});
+}
 const scheduleBadge=r=>`<span class="${isBiweekly(r)?'biweekly-badge':'schedule-badge'}">${scheduleLabel(r)}</span>`;
 const micTitle=r=>r.name;
 const updatedAt=r=>Math.max(r.updated_at||0,r.curated_at||0);
@@ -563,7 +574,7 @@ function biweeklyThisWeek(r){
   return null;
 }
 function recurrenceFields(r){
-  return '<div class="form-row">'+selectField('Schedule','frequency',[['weekly','Weekly'],['biweekly','Biweekly (every other week)'],['one-time','Pop-up mic (not recurring)']],r.frequency||(isBiweekly(r)?'biweekly':r.date&&!generatedSourceDate(r)?'one-time':'weekly'))+field('Confirmed biweekly date','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
+  return '<div class="form-row">'+selectField('Schedule','frequency',[['weekly','Weekly'],['biweekly','Biweekly (every other week)'],['non-weekly','Non-weekly · check schedule'],['one-time','Pop-up mic (not recurring)']],r.frequency||(isBiweekly(r)?'biweekly':r.date&&!generatedSourceDate(r)?'one-time':'weekly'))+field('Confirmed biweekly date','recurrence_anchor',r.recurrence_anchor||'','date',false,'A date this mic runs, to establish alternate weeks.')+'</div>';
 }
 function syncScheduleForm(form,changed=false){
   if(!form)return;const frequency=$('[name=frequency]',form)?.value;if(!frequency)return;
@@ -617,7 +628,7 @@ function card(r){
   const cost=r.cost===0?'Free':r.cost!=null?`$${r.cost}`:r.cost_text?'See fee':'—';
   const located=r.status==='scheduled'&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);
   const title=micTitle(r),venue=`${r.venue} · ${r.borough}`;
-  return `<article class="mic-card ${isBiweekly(r)?'biweekly-mic':''}" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):esc(isBiweekly(r)&&!r.date&&!r.recurrence_anchor?'Dates unconfirmed':new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'}))}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button></div><div class="mic-meta">${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}${scheduleBadge(r)}${claimBadge(r)}</div><small class="row-updated" title="${updatedAt(r)?esc(new Date(updatedAt(r)*1000).toLocaleString()):'Not recorded'}">Updated ${esc(updatedText(r))}</small></div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
+  return `<article class="mic-card ${isBiweekly(r)?'biweekly-mic':''}" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):esc(scheduleDay(r))}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button></div><div class="mic-meta">${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}${scheduleBadge(r)}${claimBadge(r)}</div><small class="row-updated" title="${updatedAt(r)?esc(new Date(updatedAt(r)*1000).toLocaleString()):'Not recorded'}">Updated ${esc(updatedText(r))}</small></div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
 }
 function filtersDialog(){
   const option=(v,t,current)=>`<option value="${v}" ${current===v?'selected':''}>${t}</option>`;
@@ -630,7 +641,7 @@ function details(id,tab='mic',page=0){
   const tabs=['mic','hosts','notes','sources','link'].map(t=>`<button class="compact-button ${tab===t?'active':''}" data-action="detail-tab" data-id="${esc(id)}" data-tab="${t}" aria-pressed="${tab===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
   let body='';
   if(tab==='mic'){
-    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('REPEATS',scheduleLabel(r)+(isBiweekly(r)?' · '+(biweeklyThisWeek(r)===null?'dates unconfirmed':biweeklyThisWeek(r)?'on this week':'off this week'):''))}${item('WHEN',`${isBiweekly(r)&&!r.date&&!r.recurrence_anchor?DAYS[r.weekday]+' · dates unconfirmed':new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',timeZone:'UTC'})} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('STATUS',r.status+' · '+claimLabel(r))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?(badslava\.com|comediq\.us)\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
+    body=`<p class="detail-location">${esc(r.venue)} · ${esc(r.borough)}<br>${esc(r.address||'Address not listed')}</p><div class="detail-grid">${item('REPEATS',scheduleLabel(r)+(isBiweekly(r)?' · '+(biweeklyThisWeek(r)===null?'dates unconfirmed':biweeklyThisWeek(r)?'on this week':'off this week'):''))}${item('WHEN',`${scheduleDay(r,true)} · ${timeText(r.start_time)}`)}${item('SIGNUP',timeText(r.signup_time))}${item('ENTRY FEE',r.cost_text||'Not listed')}${item('STAGE TIME',r.set_minutes?`${r.set_minutes} minutes`:'Not listed')}${item('STATUS',r.status+' · '+claimLabel(r))}</div><div class="detail-actions">${r.signup_url?external(r.signup_url,/^https?:\/\/(www\.)?(badslava\.com|comediq\.us)\//i.test(r.signup_url)?'Source details':'Signup','button primary'):''}${r.address?external('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(r.address+', '+r.borough+', NY'),'Directions','button quiet'):''}</div>`;
   }else if(tab==='hosts'){
     const links=String(r.host_socials||'').split(/\s+/).filter(Boolean);
     body=`<p>${esc(r.host_names||'Host not listed')}</p><div class="host-links">${links.map(u=>external(u,new URL(safeUrl(u)||'https://example.com').hostname.replace('www.',''),'button quiet')).join('')}</div><p class="form-helper">${r.claimed?'An approved host can update these details.':'Host details are from the source unless a host claims this mic.'}</p>`;

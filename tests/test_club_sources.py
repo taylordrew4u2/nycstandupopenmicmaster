@@ -30,3 +30,16 @@ def test_biweekly_anchor_validation():
  raw['recurrence_anchor']='2026-09-30'
  rows,warnings,skipped=normalize_rows([raw],SourceConfig(name='Test'))
  assert skipped==1 and not rows and 'weekday' in warnings[0]
+
+
+def test_nonweekly_import_retains_uncertainty_without_inventing_dates():
+ from app.parsers import normalize_rows
+ raw=dict(name='Irregular mic',venue='Venue',borough='Queens',weekday='Tuesday',
+          start_time='6pm',frequency='non-weekly',notes='Screenshot marks non-weekly; check schedule.')
+ rows,warnings,skipped=normalize_rows([raw],SourceConfig(name='User screenshots',kind='upload'))
+ assert not skipped and not warnings and len(rows)==1
+ assert rows[0]['frequency']=='non-weekly' and rows[0]['weekday']==1
+ assert rows[0]['date'] is None and rows[0]['recurrence_anchor'] is None
+ raw['recurrence_anchor']='2026-10-06'
+ rows,warnings,skipped=normalize_rows([raw],SourceConfig(name='User screenshots',kind='upload'))
+ assert skipped==1 and not rows and 'biweekly frequency' in warnings[0]

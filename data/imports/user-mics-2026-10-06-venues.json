@@ -1,0 +1,102 @@
+{
+  "checked_at": "2026-10-06",
+  "purpose": "Venue address evidence for screenshot mic import. Address confirmation alone does not verify a mic schedule or host ownership.",
+  "venues": [
+    {
+      "screenshot_venue": "Sanger Hall",
+      "venue": "Sanger Hall",
+      "address": "48-20 Skillman Avenue, Queens, NY 11104",
+      "borough": "Queens",
+      "neighborhood": "Sunnyside",
+      "latitude": null,
+      "longitude": null,
+      "address_confidence": "official_venue_website",
+      "sources": [{"url": "https://www.sangerhall.com/info", "ref": "turn58view1", "supports": "Venue address and Sunnyside neighborhood"}],
+      "mic_schedule_verified": false
+    },
+    {
+      "screenshot_venue": "Nostrand Avenue Pub",
+      "venue": "Nostrand Avenue Pub",
+      "address": "658 Nostrand Avenue, Brooklyn, NY 11216",
+      "borough": "Brooklyn",
+      "neighborhood": "Crown Heights",
+      "latitude": null,
+      "longitude": null,
+      "address_confidence": "multiple_independent_local_listings",
+      "sources": [
+        {"url": "https://nooklyn.com/locations/Y76YzEDwdx2uPinbnzag", "ref": "turn61view2", "supports": "658 Nostrand Ave, Crown Heights; links official Instagram"},
+        {"url": "https://www.yellowpages.com/brooklyn-ny/mip/nostrand-avenue-pub-475828057", "ref": "turn57search21", "supports": "658 Nostrand Ave, Brooklyn NY 11216"}
+      ],
+      "official_profile_url": "https://www.instagram.com/nostrandpub/",
+      "notes": "Official Instagram could not be retrieved; historical venue blog redirected to a Google challenge. Do not label mic venue-confirmed on the strength of these directory addresses.",
+      "mic_schedule_verified": false
+    },
+    {
+      "screenshot_venue": "Mood Ring",
+      "venue": "Mood Ring",
+      "address": "1260 Myrtle Avenue, Brooklyn, NY 11221",
+      "borough": "Brooklyn",
+      "latitude": null,
+      "longitude": null,
+      "address_confidence": "official_venue_website",
+      "sources": [{"url": "https://www.moodringnyc.club/home", "ref": "turn58view3", "supports": "Venue address"}],
+      "mic_schedule_verified": false
+    },
+    {
+      "screenshot_venue": "Social House Cafe",
+      "venue": "Social House Cafe",
+      "address": "60 Broadway, Brooklyn, NY 11249",
+      "borough": "Brooklyn",
+      "neighborhood": "Williamsburg",
+      "latitude": null,
+      "longitude": null,
+      "address_confidence": "official_venue_website",
+      "sources": [
+        {"url": "https://www.socialhousecafellc.com/contact", "ref": "turn58view2", "supports": "Venue address"},
+        {"url": "https://www.socialhousecafellc.com/private-events", "ref": "turn56search30", "supports": "Williamsburg neighborhood"}
+      ],
+      "mic_schedule_verified": false,
+      "notes": "Golden Hour event not separately corroborated; preserve screenshot non-weekly uncertainty."
+    },
+    {
+      "screenshot_venue": "McCarren Parkhouse",
+      "venue": "McCarren Parkhouse",
+      "address": "855 Lorimer Street, Brooklyn, NY 11222",
+      "borough": "Brooklyn",
+      "latitude": null,
+      "longitude": null,
+      "address_confidence": "official_venue_website",
+      "sources": [{"url": "https://mccarrenparkhouse.com/home", "ref": "turn58view4", "supports": "Venue address"}],
+      "mic_schedule_verified": false,
+      "secondary_schedule_evidence": {"url": "https://comediq.us/open-mics", "ref": "turn59search1", "description": "Skin Tag listed Monday 7:15 PM, matching presumed Monday screenshot; listing includes historical SKIPS 9/14 note."}
+    },
+    {
+      "screenshot_venue": "Crystal Lake",
+      "venue": "Crystal Lake Brooklyn",
+      "address": "647 Grand Street, Brooklyn, NY 11211",
+      "borough": "Brooklyn",
+      "neighborhood": "Williamsburg",
+      "latitude": null,
+      "longitude": null,
+      "address_confidence": "official_venue_website",
+      "sources": [{"url": "https://www.crystallakebrooklyn.com/", "ref": "turn58view5", "supports": "Venue address and Williamsburg neighborhood"}],
+      "mic_schedule_verified": false,
+      "secondary_schedule_evidence": {"url": "https://comediq.us/mics/crystal-lake-brooklyn-williamsburg", "ref": "turn59search0", "description": "Digiii Mic listed biweekly Mondays at 7:30 PM; host Instagram @digiiimic. No anchor date confirmed."},
+      "notes": "Comediq entry incorrectly uses 647 Manhattan Ave, Brooklyn NY 11222 and labels borough Manhattan. Use official 647 Grand Street address."
+    },
+    {
+      "screenshot_venue": "UCB",
+      "venue": "Upright Citizens Brigade Theatre",
+      "address": "242 East 14th Street, New York, NY 10003",
+      "borough": "Manhattan",
+      "latitude": null,
+      "longitude": null,
+      "address_confidence": "official_venue_website",
+      "sources": [{"url": "https://ucbcomedy.com/show/byot-08-23-26/", "ref": "turn64view0", "supports": "BYOT address, Sundays 9 PM, second and fourth Sunday recurrence"}],
+      "mic_schedule_verified": true,
+      "mic_name": "B.Y.O.T.",
+      "schedule": {"weekday": 6, "start_time": "21:00", "recurrence_text": "Second and fourth Sunday of each month", "frequency": "", "recurrence_anchor": null},
+      "notes": "BYOT is confirmed on the official venue website. Twice monthly on ordinal Sundays is not equivalent to every other week; preserve non-weekly status if ordinal monthly recurrence is unsupported. The official store also lists an upcoming October 11, 2026 BYOT at 9 PM. Address does not confirm Nice Girls schedule."
+    }
+  ]
+}
