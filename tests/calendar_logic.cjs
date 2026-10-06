@@ -39,3 +39,24 @@ assert.equal(run(`scheduleDay(${irregular},true)`),'Monday · dates unconfirmed'
 assert(run("occursOnDate({weekday:null,date:'2026-10-05',frequency:'non-weekly'},'2026-10-05')"));
 assert(!run("occursOnDate({weekday:null,date:'2026-10-05',frequency:'non-weekly'},'2026-10-12')"));
 console.log('Non-weekly import visibility and honest date labels passed');
+
+// Actual Comediq import shape: generated date, no stored weekday.
+const datedImport={weekday:null,date:'2026-10-06',frequency:'weekly',sources:[{url:'https://comediq.us/mics.json'}]};
+ctx.datedImport=datedImport;
+assert.equal(run('recurrenceDay(datedImport)'),1);
+assert(run("occursOnDate(datedImport,'2026-10-13')"));
+assert(!run("occursOnDate(datedImport,'2026-10-12')"));
+run("state.date=null;state.day=1");
+assert(run('occurs(datedImport)'));
+assert.equal(run('weekday(nextDate(datedImport))'),1);
+assert.notEqual(run('nextDate(datedImport)'),'9999-12-31');
+run('state.day=0');
+assert(!run('occurs(datedImport)'));
+assert(!run("occursOnDate({...datedImport,frequency:'non-weekly'},'2026-10-13')"));
+assert(run("occursOnDate({...datedImport,overridden_fields:['date']},'2026-10-06')"));
+assert(!run("occursOnDate({...datedImport,overridden_fields:['date']},'2026-10-13')"));
+assert(!run("occursOnDate({...datedImport,frequency:'one-time'},'2026-10-13')"));
+assert.equal(run("recurrenceDay({...datedImport,weekday:2})"),2);
+assert.equal(run("recurrenceDay({weekday:null,date:'2026-10-06'})"),null);
+assert.equal(run("recurrenceDay({...datedImport,date:'2026-02-30'})"),null);
+console.log('Comediq dates without weekdays remain searchable; explicit dates stay exact');

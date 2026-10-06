@@ -211,3 +211,12 @@ def test_nonweekly_schedule_does_not_claim_weekly_or_create_occurrences():
     assert 'Confirmed dates' in content and 'check the mic’s schedule before going' in content
     assert '/?date=' not in content
     assert '"startDate"' not in content
+
+
+def test_comediq_generated_date_recovers_missing_weekday():
+    row = listing(weekday=None, date='2026-10-06', sources=[{'url': 'https://comediq.us/mics.json'}])
+    assert seo.schedule(row) == 'Tuesday at 7:30 PM · Weekly'
+    row['overridden_fields'] = ['date']
+    assert 'Tuesday, October 6, 2026' in seo.schedule(row)
+    row['frequency'] = 'one-time'
+    assert 'Pop-up mic (not recurring)' in seo.schedule(row)

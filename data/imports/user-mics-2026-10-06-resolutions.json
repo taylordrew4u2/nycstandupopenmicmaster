@@ -1,0 +1,558 @@
+{
+  "checked_at": "2026-10-06",
+  "live_corrections": [
+    {
+      "id": "86d0aba689d24cb69255864f23b0979b",
+      "name": "Pure Chaos Comedy",
+      "changes": {
+        "notes": {
+          "before": "",
+          "after": "Schedule review, October 6, 2026: The existing manually added time is 6:30 PM. The submitted image and another directory list 7 PM. Current public event listings also disagree; confirm signup/start time with https://www.instagram.com/purechaoscomedy/ before traveling."
+        }
+      }
+    },
+    {
+      "id": "28c91b2dc3c6909d993662f6",
+      "name": "B.Y.O.T.",
+      "changes": {
+        "latitude": {
+          "before": null,
+          "after": 40.732791479765
+        },
+        "longitude": {
+          "before": null,
+          "after": -73.986151581704
+        },
+        "notes": {
+          "before": "User-submitted schedule image IMG_6364.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Non-weekly; check mic's page for schedule. The official BYOT page lists the second and fourth Sundays at 9 PM; this is twice monthly, not every other week. Venue address checked on the official page.",
+          "after": "User-submitted schedule image IMG_6364.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Non-weekly; check mic's page for schedule. The official BYOT page lists the second and fourth Sundays at 9 PM; this is twice monthly, not every other week. Venue address checked on the official page. Map pin: approximate US Census street-address match, checked October 6, 2026."
+        }
+      }
+    },
+    {
+      "id": "9b1d384b97ca14b419f0a158",
+      "name": "The Mic",
+      "changes": {
+        "venue": {
+          "before": "The Improv",
+          "after": "Brooklyn Improv"
+        },
+        "address": {
+          "before": "",
+          "after": "64 N 9th St, Brooklyn, NY 11249"
+        },
+        "borough": {
+          "before": "Manhattan",
+          "after": "Brooklyn"
+        },
+        "neighborhood": {
+          "before": "",
+          "after": "Williamsburg"
+        },
+        "latitude": {
+          "before": null,
+          "after": 40.720767973005
+        },
+        "longitude": {
+          "before": null,
+          "after": -73.959590572162
+        },
+        "host_socials": {
+          "before": "",
+          "after": "https://www.instagram.com/themicattheimprov/"
+        },
+        "notes": {
+          "before": "User-submitted schedule image IMG_6362.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Address unconfirmed; shown in the list without a guessed map pin. Comediq identifies this venue as East Village.",
+          "after": "Saturday 3:30 PM from the user-submitted schedule image. Brooklyn Improv address verified October 6, 2026 at https://improv.com/brooklyn/info/; the official venue site also describes its weekly open mic. Confirm this week with @themicattheimprov before traveling. Map pin is an approximate US Census street-address match."
+        }
+      }
+    },
+    {
+      "id": "817a6d6277fdb6763366c3a4",
+      "name": "Breakfast of Champions",
+      "changes": {
+        "venue": {
+          "before": "Telephone",
+          "after": "Telephone Room (Ange Noir Cafe)"
+        },
+        "address": {
+          "before": "144 10th Ave",
+          "after": "247 Varet St, Brooklyn, NY 11206"
+        },
+        "borough": {
+          "before": "Manhattan",
+          "after": "Brooklyn"
+        },
+        "neighborhood": {
+          "before": "",
+          "after": "Bushwick"
+        },
+        "latitude": {
+          "before": 40.745132272479,
+          "after": 40.704151934366
+        },
+        "longitude": {
+          "before": -74.005844767208,
+          "after": -73.933970582984
+        },
+        "notes": {
+          "before": "User-submitted schedule image IMG_6358.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling.",
+          "after": "User-submitted schedule image IMG_6358.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Venue address corrected against https://angenoircafe.com/ on October 6, 2026. Map pin is an approximate US Census street-address match."
+        }
+      }
+    },
+    {
+      "id": "21c67f22d5a7f92e6f22be84",
+      "name": "Sanger Hall",
+      "changes": {
+        "latitude": {
+          "before": null,
+          "after": 40.746270982327
+        },
+        "longitude": {
+          "before": null,
+          "after": -73.91593637787
+        },
+        "notes": {
+          "before": "User-submitted schedule image IMG_6358.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Non-weekly; check mic's page for schedule. Queens.",
+          "after": "User-submitted schedule image IMG_6358.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Non-weekly; check mic's page for schedule. Queens. Map pin: approximate US Census street-address match, checked October 6, 2026."
+        }
+      }
+    },
+    {
+      "id": "c5fa11033f328590659e64bf",
+      "name": "Franzia",
+      "changes": {
+        "latitude": {
+          "before": null,
+          "after": 40.675931922102
+        },
+        "longitude": {
+          "before": null,
+          "after": -73.950006573074
+        },
+        "notes": {
+          "before": "User-submitted schedule image IMG_6358.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling.",
+          "after": "User-submitted schedule image IMG_6358.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Map pin: approximate US Census street-address match, checked October 6, 2026."
+        }
+      }
+    },
+    {
+      "id": "5cd7850f7e1c00951cf1a31a",
+      "name": "Rant",
+      "changes": {
+        "latitude": {
+          "before": null,
+          "after": 40.697870718903
+        },
+        "longitude": {
+          "before": null,
+          "after": -73.926749876051
+        },
+        "notes": {
+          "before": "User-submitted schedule image IMG_6356.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Day inferred from seven-day image set; verify Monday. LGBTQ and women.",
+          "after": "User-submitted schedule image IMG_6356.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Day inferred from seven-day image set; verify Monday. LGBTQ and women. Map pin: approximate US Census street-address match, checked October 6, 2026."
+        }
+      }
+    },
+    {
+      "id": "5c619573a0fce960a50e4dda",
+      "name": "Golden Hour",
+      "changes": {
+        "latitude": {
+          "before": null,
+          "after": 40.710544416444
+        },
+        "longitude": {
+          "before": null,
+          "after": -73.966559354121
+        },
+        "notes": {
+          "before": "User-submitted schedule image IMG_6356.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Day inferred from seven-day image set; verify Monday. Non-weekly; check mic's page for schedule.",
+          "after": "User-submitted schedule image IMG_6356.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Day inferred from seven-day image set; verify Monday. Non-weekly; check mic's page for schedule. Map pin: approximate US Census street-address match, checked October 6, 2026."
+        }
+      }
+    },
+    {
+      "id": "3ba509a3c4ded9e2d900a920",
+      "name": "Skin Tag",
+      "changes": {
+        "latitude": {
+          "before": null,
+          "after": 40.722293816634
+        },
+        "longitude": {
+          "before": null,
+          "after": -73.951058767113
+        },
+        "notes": {
+          "before": "User-submitted schedule image IMG_6356.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Day inferred from seven-day image set; verify Monday.",
+          "after": "User-submitted schedule image IMG_6356.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Day inferred from seven-day image set; verify Monday. Map pin: approximate US Census street-address match, checked October 6, 2026."
+        }
+      }
+    },
+    {
+      "id": "5b1c832442bc8a7f07eccc66",
+      "name": "DIGIII",
+      "changes": {
+        "latitude": {
+          "before": null,
+          "after": 40.711462437827
+        },
+        "longitude": {
+          "before": null,
+          "after": -73.946397337046
+        },
+        "notes": {
+          "before": "User-submitted schedule image IMG_6356.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Day inferred from seven-day image set; verify Monday. Non-weekly; check mic's page for schedule. Official venue website confirms 647 Grand Street, Brooklyn. Exact performance dates remain unconfirmed.",
+          "after": "User-submitted schedule image IMG_6356.jpeg, received October 6, 2026. The image publication date is unknown; confirm current details before traveling. Day inferred from seven-day image set; verify Monday. Non-weekly; check mic's page for schedule. Official venue website confirms 647 Grand Street, Brooklyn. Exact performance dates remain unconfirmed. Map pin: approximate US Census street-address match, checked October 6, 2026."
+        }
+      }
+    },
+    {
+      "id": "8113a706e3be801232176088",
+      "name": "Laughing Friends",
+      "changes": {
+        "weekday": {
+          "before": null,
+          "after": 2
+        },
+        "date": {
+          "before": "2026-10-07",
+          "after": null
+        },
+        "frequency": {
+          "before": "",
+          "after": "non-weekly"
+        },
+        "notes": {
+          "before": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling.",
+          "after": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling. Schedule review, October 6, 2026: The submitted image lists 5 PM and marks this non-weekly; the directory feed lists 5:30 PM. Exact dates and the current signup/start time are unconfirmed. Check https://www.instagram.com/laughingfriends.ig/ before traveling."
+        }
+      }
+    },
+    {
+      "id": "a0a23f459eb9e340a19ed991",
+      "name": "Eiffel Tower",
+      "changes": {
+        "venue": {
+          "before": "Easy Lover",
+          "after": "Eris Mainstage (Brooklyn Comedy Collective)"
+        },
+        "address": {
+          "before": "221 N 14th St",
+          "after": "167 Graham Avenue, Brooklyn, NY 11206"
+        },
+        "start_time": {
+          "before": "20:15",
+          "after": "20:30"
+        },
+        "signup_time": {
+          "before": null,
+          "after": "20:15"
+        },
+        "latitude": {
+          "before": 40.722653642633,
+          "after": 40.707882669843
+        },
+        "longitude": {
+          "before": -73.954882125349,
+          "after": -73.943367432536
+        },
+        "host_names": {
+          "before": "",
+          "after": "Audrey Garrett, Ben Jenkins, Jack Walz"
+        },
+        "signup_url": {
+          "before": "https://comediq.us/open-mics#1c145ee3-5380-481a-94a9-e9d13e878216",
+          "after": "https://www.brooklyncc.com/show-schedule/eiffel-tower-mic-10-13"
+        },
+        "notes": {
+          "before": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling.",
+          "after": "Every Tuesday at Eris Mainstage, 167 Graham Avenue. Signup 8:15 PM; mic starts 8:30 PM. Three-minute sets, ages 21+. Venue and time checked against the official BCC calendar on October 6, 2026. Map pin is an approximate US Census street-address match. https://www.brooklyncc.com/show-schedule/eiffel-tower-mic-10-13"
+        }
+      }
+    },
+    {
+      "id": "07db40cdad5fd17177271701",
+      "name": "Jester's Privilege",
+      "changes": {
+        "venue": {
+          "before": "Telephone",
+          "after": "Telephone Room (Ange Noir Cafe)"
+        },
+        "address": {
+          "before": "144 10th Ave",
+          "after": "247 Varet St, Brooklyn, NY 11206"
+        },
+        "borough": {
+          "before": "Manhattan",
+          "after": "Brooklyn"
+        },
+        "neighborhood": {
+          "before": "",
+          "after": "Bushwick"
+        },
+        "latitude": {
+          "before": 40.745132272479,
+          "after": 40.704151934366
+        },
+        "longitude": {
+          "before": -74.005844767208,
+          "after": -73.933970582984
+        },
+        "notes": {
+          "before": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling.",
+          "after": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling. Venue address corrected against https://angenoircafe.com/ on October 6, 2026. Map pin is an approximate US Census street-address match. The submitted image says 6:30 PM; the directory feed says 6:15 PM. Confirm signup and start times with @jestersprivilege.comedy."
+        }
+      }
+    },
+    {
+      "id": "903df543af99cc89601dd24d",
+      "name": "Hot Mic",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Hot Mic"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Name corroborated by https://badslava.com/details.php?id=13980. The submitted image marks this non-weekly; verify current dates with the host."
+        }
+      }
+    },
+    {
+      "id": "32868c22a40d4d9f0ca31914",
+      "name": "Suite Gay Bar Mic",
+      "changes": {
+        "notes": {
+          "before": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling.",
+          "after": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling. Schedule review, October 6, 2026: Also listed as Wednesdays at Suite in the submitted image. The image says 7 PM; the directory feed says 7:15 PM. Confirm signup and start times with the host."
+        }
+      }
+    },
+    {
+      "id": "40a3c4fdfc1bd918667ae9dd",
+      "name": "The Champs Open Mic",
+      "changes": {
+        "start_time": {
+          "before": "18:30",
+          "after": "18:00"
+        },
+        "notes": {
+          "before": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling.",
+          "after": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling. Reviewed October 6, 2026: the current weekly poster on https://www.pineboxrockshop.com/ lists C.H.A.M.P.S. Wednesdays at 6 PM, matching the submitted image."
+        }
+      }
+    },
+    {
+      "id": "85cb2291406dfa675be5c444",
+      "name": "Mr. Owl",
+      "changes": {
+        "venue": {
+          "before": "The Telephone Room",
+          "after": "Telephone Room (Ange Noir Cafe)"
+        },
+        "address": {
+          "before": "144 10th Ave",
+          "after": "247 Varet St, Brooklyn, NY 11206"
+        },
+        "borough": {
+          "before": "Manhattan",
+          "after": "Brooklyn"
+        },
+        "neighborhood": {
+          "before": "",
+          "after": "Bushwick"
+        },
+        "latitude": {
+          "before": 40.745132272479,
+          "after": 40.704151934366
+        },
+        "longitude": {
+          "before": -74.005844767208,
+          "after": -73.933970582984
+        },
+        "notes": {
+          "before": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling.",
+          "after": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling. Venue address corrected against https://angenoircafe.com/ on October 6, 2026. Map pin is an approximate US Census street-address match. The submitted image says 6:30 PM; the directory feed says 7 PM. Confirm signup and start times with @mrowlpresents."
+        }
+      }
+    },
+    {
+      "id": "8e2cbf4a2d0bb60eb7c3dca5",
+      "name": "Death to All of Them",
+      "changes": {
+        "notes": {
+          "before": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling.",
+          "after": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling. Schedule review, October 6, 2026: The submitted image lists 7 PM; the directory feed lists 7:30 PM. Hell Phone and Telephone Room refer to the venue at Ange Noir Cafe, 247 Varet St, Brooklyn. Confirm signup and start times with https://www.instagram.com/deathtoallofthem/."
+        }
+      }
+    },
+    {
+      "id": "3d7f1d256346cc85f424e03c",
+      "name": "Manhattan Mic",
+      "changes": {
+        "name": {
+          "before": "Greenpoint Comedy Club",
+          "after": "Manhattan Mic"
+        },
+        "notes": {
+          "before": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling.",
+          "after": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling. Mic name from the submitted Thursday schedule image, matched to the existing Thursday 5:30 PM Greenpoint Comedy Club listing. Other directories contain an older Manhattan Mic listing at Fiction Bar; confirm current host details before traveling. Reviewed October 6, 2026."
+        }
+      }
+    },
+    {
+      "id": "f96fb1e4491b3b48e75e6ca1",
+      "name": "Finite Jest",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Finite Jest"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Name and Wednesday 6:30 PM slot corroborated by https://badslava.com/details.php?id=15382 and the submitted image."
+        }
+      }
+    },
+    {
+      "id": "956de4e4145337bf9268f9f0",
+      "name": "Freddy's Mic",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Freddy's Mic"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Mic name from the submitted image, matched to the existing Wednesday 7 PM listing at the same venue."
+        }
+      }
+    },
+    {
+      "id": "56e64f029e3b6556d39dadf0",
+      "name": "Cuckoo's",
+      "changes": {
+        "weekday": {
+          "before": null,
+          "after": 2
+        },
+        "date": {
+          "before": "2026-10-07",
+          "after": null
+        },
+        "frequency": {
+          "before": "",
+          "after": "non-weekly"
+        },
+        "notes": {
+          "before": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling.",
+          "after": "Listed in Comediq\u2019s public feed. Confirm the schedule and signup details at the source before traveling. Schedule review, October 6, 2026: The submitted image lists 10 PM and marks this non-weekly; the directory feed lists 9:30 PM. Current dates and signup/start times remain unconfirmed. Check the host or Soho Playhouse before traveling."
+        }
+      }
+    },
+    {
+      "id": "54d7ca42500d99846c1d65a9",
+      "name": "Some Good Comedy",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Some Good Comedy"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Mic name from the submitted image, matched to the existing Thursday 6:30 PM listing at the same venue."
+        }
+      }
+    },
+    {
+      "id": "0fdc8efda3f05b62458fc53d",
+      "name": "Thursdays at the Rib",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Thursdays at the Rib"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Non-weekly schedule reported in the submitted image and Comediq. This dated occurrence comes from Badslava; verify the week with the host."
+        }
+      }
+    },
+    {
+      "id": "c96bfb18237061fae4cc5006",
+      "name": "Summer Fridays",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Summer Fridays"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Weather permitting. Name and Friday 7 PM slot corroborated by https://badslava.com/details.php?id=60894 and the submitted image."
+        }
+      }
+    },
+    {
+      "id": "8bcf993472fe75e7b59bb234",
+      "name": "Sunday Scaries Mic",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Sunday Scaries Mic"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Name and Sunday 4 PM slot corroborated by https://badslava.com/details.php?id=38706 and the submitted image."
+        }
+      }
+    },
+    {
+      "id": "f6030b162b0533826ebbeea1",
+      "name": "Pillow Fight",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Pillow Fight"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Monday 6 PM schedule and mic name confirmed by the weekly poster on https://www.pineboxrockshop.com/ on October 6, 2026."
+        }
+      }
+    },
+    {
+      "id": "b466f1563ad20b9e3ddd588a",
+      "name": "Garfield: The Mic",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Garfield: The Mic"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Name and Monday 7 PM slot corroborated by https://badslava.com/details.php?id=36710. Signup list at 6:45 PM."
+        }
+      }
+    },
+    {
+      "id": "736716d6bf90ee89aeb85369",
+      "name": "Snakes On A Stage",
+      "changes": {
+        "name": {
+          "before": "Open Mic",
+          "after": "Snakes On A Stage"
+        },
+        "notes": {
+          "before": "Listed by Badslava. Confirm details with the venue before traveling.",
+          "after": "Listed by Badslava. Confirm details with the venue before traveling. Reviewed October 6, 2026: Name from https://badslava.com/details.php?id=15184. This is a different listing from We\u2019re All Friends Here; do not merge the two just because they share a venue and time."
+        }
+      }
+    }
+  ],
+  "unmapped_count": 0,
+  "pending_import": "cobra-confirmed-2026-10-06.csv",
+  "pending_reason": "Browser connection stalled during upload before preview or publish; verified absent from public API."
+}

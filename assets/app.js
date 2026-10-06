@@ -59,6 +59,8 @@ async function loadPublic(){
 }
 const validDate=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(d+'T12:00:00Z'))&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d;
 const generatedSourceDate=row=>row.frequency!=='one-time'&&(row.sources||[]).some(s=>s.url==='https://comediq.us/mics.json')&&!row.overridden_fields?.includes('date');
+// Comediq supplies generated dates but imported dated rows can have no weekday.
+const recurrenceDay=row=>Number.isInteger(row.weekday)&&row.weekday>=0&&row.weekday<7?row.weekday:generatedSourceDate(row)&&validDate(row.date)?weekday(row.date):null;
 function occursOnDate(row,date){
   if(!validDate(date))return false;
   if((row.excluded_dates||[]).includes(date))return false;
@@ -66,7 +68,7 @@ function occursOnDate(row,date){
   if(row.date&&!generatedDate)return row.date===date;
   // A non-weekly listing without confirmed dates is discoverable by weekday, not a dated occurrence.
   if(row.frequency==='non-weekly')return false;
-  if(!Number.isInteger(row.weekday)||row.weekday!==weekday(date))return false;
+  if(recurrenceDay(row)!==weekday(date))return false;
   if(isBiweekly(row)&&row.recurrence_anchor){const diff=Math.round((new Date(date+'T12:00:00Z')-new Date(row.recurrence_anchor+'T12:00:00Z'))/86400000);return diff>=0&&diff%14===0;}
   // Unknown alternate-week anchors stay visible rather than silently dropping a mic.
   return true;
@@ -85,15 +87,16 @@ function occurs(row){
   const dated=row.date&&!generatedSourceDate(row);
   if(dated&&row.date<nyToday())return false;
   if(state.day==='all')return true;
-  return dated?weekday(row.date)===Number(state.day):row.weekday===Number(state.day);
+  return dated?weekday(row.date)===Number(state.day):recurrenceDay(row)===Number(state.day);
 }
 function nextDate(row){
   if(row.frequency==='non-weekly'&&(!row.date||generatedSourceDate(row)))return '9999-12-31';
   if(state.date)return state.date;
   if(row.date&&!generatedSourceDate(row))return row.date;
-  if(!Number.isInteger(row.weekday))return '9999-12-31';
+  const day=recurrenceDay(row);
+  if(day===null)return '9999-12-31';
   const today=nyToday(),d=new Date(today+'T12:00:00Z');
-  d.setUTCDate(d.getUTCDate()+(Number(row.weekday)-weekday(today)+7)%7);
+  d.setUTCDate(d.getUTCDate()+(day-weekday(today)+7)%7);
   for(let i=0;i<53;i++){const date=d.toISOString().slice(0,10);if(occursOnDate(row,date))return date;d.setUTCDate(d.getUTCDate()+7);}
   return '9999-12-31';
 }
@@ -102,7 +105,7 @@ const claimBadge=r=>`<span class="claim-status ${r.claimed||r.venue_confirmed?'i
 function scheduleLabel(r){if(r.frequency==='non-weekly')return 'Non-weekly · check schedule';if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||generatedSourceDate(r)||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
 const datesUnconfirmed=r=>(r.frequency==='non-weekly'||(isBiweekly(r)&&!r.recurrence_anchor))&&(!r.date||generatedSourceDate(r));
 function scheduleDay(r,long=false){
-  if(datesUnconfirmed(r))return long?(DAYS[r.weekday]||'Day not listed')+' · dates unconfirmed':'Dates unconfirmed';
+  if(datesUnconfirmed(r))return long?(DAYS[recurrenceDay(r)]||'Day not listed')+' · dates unconfirmed':'Dates unconfirmed';
   return new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:long?'long':'short',month:'short',day:'numeric',timeZone:'UTC'});
 }
 const scheduleBadge=r=>`<span class="${isBiweekly(r)?'biweekly-badge':'schedule-badge'}">${scheduleLabel(r)}</span>`;
@@ -148,7 +151,7 @@ function filtered(){return state.data.listings.filter(r=>{
   if(state.claimStatus==='venue'&&!r.venue_confirmed)return false;if(state.claimStatus==='claimed'&&!r.claimed)return false;if(state.claimStatus==='unclaimed'&&r.claimed)return false;
   if(!occurs(r))return false;if(state.borough!=='all'&&r.borough!==state.borough)return false;
   if(!withinTime(r.start_time,state.timeFrom,state.timeTo))return false;
-  if(state.search&&!`${r.name} ${r.venue} ${r.address} ${r.borough} ${r.neighborhood} ${DAYS[r.weekday]||''} ${r.date||''} ${r.date?dateText(r.date):''}`.toLowerCase().includes(state.search))return false;
+  if(state.search&&!`${r.name} ${r.venue} ${r.address} ${r.borough} ${r.neighborhood} ${DAYS[recurrenceDay(r)]||''} ${r.date||''} ${r.date?dateText(r.date):''}`.toLowerCase().includes(state.search))return false;
   if(state.cost==='free'&&r.cost!==0)return false;if(['5','10'].includes(state.cost)&&(r.cost===null||r.cost>Number(state.cost)))return false;
   if(state.signup!=='all'&&!String(r.signup_method).toLowerCase().includes(state.signup))return false;return true;
 }).sort((a,b)=>state.sort==='name'?micTitle(a).localeCompare(micTitle(b)):state.sort==='price'?(a.cost??999)-(b.cost??999):(nextDate(a)+a.start_time).localeCompare(nextDate(b)+b.start_time));}
@@ -280,7 +283,7 @@ async function renderAdminBody(){const root=$('#admin-body'),a=state.admin,c=sta
 }
 function renderAdminMics(q){const rows=state.community.listings.filter(r=>`${r.name} ${r.venue} ${r.borough}`.toLowerCase().includes(q));$('#admin-mic-rows').innerHTML=rows.length?rows.map(r=>`<article class="queue-item"><div class="queue-heading"><div><h3>${esc(r.name)}</h3><small>${esc(r.venue)} · ${esc(r.borough)} · ${esc(r.date||DAYS[r.weekday])} ${esc(timeText(r.start_time))}</small></div><span class="tag">${r.hidden?'Hidden':'Published'}</span></div><p>${r.claimed?'Host claimed · ':''}${r.curated?'Edited values protected from scraping · ':''}${!Number.isFinite(r.latitude)?'Location needs a map pin':'Location mapped'}</p><div class="queue-buttons">${button('Edit mic / pin','edit-admin',r.id,'primary')}${button(r.hidden?'Publish':'Hide from directory','mic-hide',r.id)}${r.curated?button('Restore source values','mic-restore',r.id):''}</div></article>`).join(''):blank('No listings yet.','Import a source or add a mic manually.');}
 function editForm(id,mode){const r=id?findMic(id):{};if(id&&!r){toast('This mic is no longer available.');return;}
-  modal(id?'Edit the mic.':'Add a mic.',`<p>${mode==='owner'?'You can edit only mics approved for your account. Your edits take priority over imports.':'Changes are saved over the source data. Unchanged fields continue syncing.'}</p><form id="edit-form" data-id="${esc(id||'')}" data-mode="${mode}"><div class="form-row">${field('Mic name','name',r.name||'','text',true)}${field('Venue','venue',r.venue||'','text',true)}</div>${field('Street address','address',r.address||'','text',true)}<div class="form-row">${selectField('Borough','borough',BOROUGHS,r.borough||'Manhattan')}${field('Neighborhood (optional)','neighborhood',r.neighborhood||'')}</div><div class="form-row">${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),r.weekday??0)}${field('One-time date (overrides weekly day)','date',r.date||'','date')}</div><div class="form-row">${field('Start time','start_time',r.start_time||'19:00','time',true)}${field('Signup time (optional)','signup_time',r.signup_time||'','time')}</div><div class="form-row">${field('Entry fee (Free, $5, or descriptive)','cost',r.cost_text||'')}${field('Purchase minimum (optional)','purchase_minimum',r.purchase_minimum||'')}</div><div class="form-row">${field('Minutes per comic','set_minutes',r.set_minutes||'','number')}${field('Signup method','signup_method',r.signup_method||'')}</div>${field('Host name(s), public','host_names',r.host_names||'')}${textField('Host social links (optional, up to 5 URLs)','host_socials',r.host_socials||'')}${field('Signup link','signup_url',r.signup_url||'','url')}${selectField('Status','status',['scheduled','cancelled','postponed'],r.status||'scheduled')}${recurrenceFields(r)}${field('Excluded dates, comma-separated YYYY-MM-DD','excluded_dates',(r.excluded_dates||[]).join(', '))}${textField('Notes','notes',r.notes||'')}<details><summary>Map pin coordinates</summary><p class="form-helper">Use accurate coordinates for this venue. Leave both blank to request address geocoding. Approximate geocoder matches are labeled on the directory.</p><div class="form-row">${field('Latitude','latitude',r.latitude??'','number')}${field('Longitude','longitude',r.longitude??'','number')}</div></details><button type="submit" class="button primary">Save mic ↗</button></form>`);
+  modal(id?'Edit the mic.':'Add a mic.',`<p>${mode==='owner'?'You can edit only mics approved for your account. Your edits take priority over imports.':'Changes are saved over the source data. Unchanged fields continue syncing.'}</p><form id="edit-form" data-id="${esc(id||'')}" data-mode="${mode}"><div class="form-row">${field('Mic name','name',r.name||'','text',true)}${field('Venue','venue',r.venue||'','text',true)}</div>${field('Street address','address',r.address||'','text',true)}<div class="form-row">${selectField('Borough','borough',BOROUGHS,r.borough||'Manhattan')}${field('Neighborhood (optional)','neighborhood',r.neighborhood||'')}</div><div class="form-row">${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),recurrenceDay(r)??(validDate(r.date)?weekday(r.date):0))}${field('One-time date (overrides weekly day)','date',r.date||'','date')}</div><div class="form-row">${field('Start time','start_time',r.start_time||'19:00','time',true)}${field('Signup time (optional)','signup_time',r.signup_time||'','time')}</div><div class="form-row">${field('Entry fee (Free, $5, or descriptive)','cost',r.cost_text||'')}${field('Purchase minimum (optional)','purchase_minimum',r.purchase_minimum||'')}</div><div class="form-row">${field('Minutes per comic','set_minutes',r.set_minutes||'','number')}${field('Signup method','signup_method',r.signup_method||'')}</div>${field('Host name(s), public','host_names',r.host_names||'')}${textField('Host social links (optional, up to 5 URLs)','host_socials',r.host_socials||'')}${field('Signup link','signup_url',r.signup_url||'','url')}${selectField('Status','status',['scheduled','cancelled','postponed'],r.status||'scheduled')}${recurrenceFields(r)}${field('Excluded dates, comma-separated YYYY-MM-DD','excluded_dates',(r.excluded_dates||[]).join(', '))}${textField('Notes','notes',r.notes||'')}<details><summary>Map pin coordinates</summary><p class="form-helper">Use accurate coordinates for this venue. Leave both blank to request address geocoding. Approximate geocoder matches are labeled on the directory.</p><div class="form-row">${field('Latitude','latitude',r.latitude??'','number')}${field('Longitude','longitude',r.longitude??'','number')}</div></details><button type="submit" class="button primary">Save mic ↗</button></form>`);
   syncScheduleForm($('#edit-form'));$('#edit-form').dataset.original=JSON.stringify(Object.fromEntries(new FormData($('#edit-form'))));
 }
 function submissionTab(tab){
@@ -340,7 +343,7 @@ function renderHostEditor(){
       ${textField('Notes','notes',r.notes||'')}
     </div>
     <div class="host-edit-panel" data-host-panel="when" hidden>
-      <div class="form-row">${field('One-time date','date',r.date||'','date')}${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),r.weekday??0)}</div>
+      <div class="form-row">${field('One-time date','date',r.date||'','date')}${selectField('Weekly day','weekday',DAYS.map((d,i)=>[i,d]),recurrenceDay(r)??(validDate(r.date)?weekday(r.date):0))}</div>
       ${recurrenceFields(r)}<div class="form-row">${field('Start time','start_time',r.start_time||'19:00','time',true)}${field('Signup time (optional)','signup_time',r.signup_time||'','time')}</div>
       ${selectField('Status for this listing','status',[['scheduled','Scheduled'],['cancelled','Cancelled'],['postponed','Postponed']],r.status||'scheduled')}
       ${field('Skip dates (YYYY-MM-DD, comma separated)','excluded_dates',(r.excluded_dates||[]).join(', '))}

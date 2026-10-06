@@ -119,6 +119,8 @@ def schedule(row):
         day = date_label(row['date'])
     elif type(weekday) is int and 0 <= weekday < 7:
         day = DAYS[weekday]
+    elif actual_date and generated_source_date(row):
+        day = DAYS[actual_date.weekday()]
     else:
         day = 'Day not listed'
     return f'{day} at {time_label(row.get("start_time"))} · {recurrence(row)}'

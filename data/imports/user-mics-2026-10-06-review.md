@@ -1,5 +1,8 @@
 # October 6 screenshot import review
 
+**Follow-up:** 29 live listings were corrected on October 6; all eight missing pins are now mapped. See `user-mics-2026-10-06-resolutions.json` for exact before/after values. The table below records the original review state, not an outstanding task list. The Cobra Club addition is prepared in `cobra-confirmed-2026-10-06.csv` but remains unpublished because the admin browser connection stalled during upload. No mic was hidden or deleted.
+
+
 90 screenshot entries checked against 829 public listings. 32 missing mic sessions are represented by 44 import rows: 31 recurring/irregular entries plus 13 confirmed dated occurrences of The Goated Mic. Its official calendar changes time on November 10.
 
 38 existing name/alias matches are not imported again. The 20 cases below remain for administrator review; no existing listing is overwritten, hidden or deleted.
