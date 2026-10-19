@@ -15,8 +15,11 @@ Vercel's ephemeral filesystem. Database initialization is deferred until the fir
 request, so builds do not need a database connection.
 
 1. Link the repository to a Vercel project.
-2. Connect a hosted PostgreSQL database (for example, Neon via the Vercel Marketplace)
-   and set its pooled, TLS-enabled URL as `DATABASE_URL` (`POSTGRES_URL` also works).
+2. Connect the Supabase Free database through the Vercel Marketplace and set its
+   pooled, TLS-enabled PostgreSQL URL as `DATABASE_URL` (`POSTGRES_URL` also works).
+   Use a libpq-compatible URL: omit Prisma-only parameters such as `pgbouncer`.
+   Keep application tables inaccessible to the Supabase anonymous/authenticated
+   Data API roles; the server uses its private PostgreSQL connection.
 3. Set `ADMIN_PASSWORD` (at least 15 characters), `LOCAL_DEV=0`, and `PUBLIC_ORIGIN`
    to the production HTTPS origin.
 4. Set `GITHUB_SYNC_ENABLED=1`, deploy, and confirm `/api/health` reports

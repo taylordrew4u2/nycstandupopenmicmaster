@@ -30,6 +30,11 @@ class PostgresConnection:
         import psycopg
         self.connection = psycopg.connect(url, row_factory=row_factory,
                                           connect_timeout=15, prepare_threshold=None)
+        # Poolers may reuse sessions changed by restore or administration tools.
+        # Keep application queries in public and preserve full float precision.
+        if "search_path" not in self.connection.info.options:
+            self.connection.execute("SET LOCAL search_path = public")
+        self.connection.execute("SET LOCAL extra_float_digits = 1")
         self.connection.execute("SET statement_timeout = '15s'")
         self.connection.execute("SET lock_timeout = '15s'")
 
