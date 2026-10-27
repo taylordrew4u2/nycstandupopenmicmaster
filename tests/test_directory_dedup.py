@@ -176,6 +176,66 @@ def test_two_named_provider_sessions_at_same_room_and_time_are_not_guessed_to_be
     assert deduplicate_laughingbuddha_occurrences([first, second, official]) == [first, second, official]
 
 
+def private_buddha_pair():
+    feed = row('2026-10-27', 0, name='4:30 Buddha Room Hour Mic',
+               venue='The Buddha Room', address='410 8th Ave', start_time='16:30')
+    calendar = row('2026-10-27', 0, id='badslava-mic', name='Open Mic',
+                   venue='Laughing Buddha Comedy', address='410 8th Ave 2nd floor', start_time='16:30',
+                   external_id='badslava:46346:2026-10-27',
+                   sources=[{'id': 'badslava-source', 'url': 'https://badslava.com/open-mics-state.php?state=NY&type=Comedy',
+                             'kind': 'auto', 'missing_count': 0, 'priority': 50}])
+    return feed, calendar
+
+
+def test_private_buddha_room_pair_consolidates_without_an_official_dated_anchor():
+    feed, calendar = private_buddha_pair()
+    feed['duplicate_ids'] = ['prior-feed-id']
+    feed['recurring_history'] = [{'id': 'prior-feed-id', 'date': '2026-10-20', 'sources': feed['sources']}]
+    original = deepcopy([feed, calendar])
+    result = deduplicate_laughingbuddha_occurrences(original)
+    assert len(result) == 1 and result[0]['id'] == feed['id']
+    assert result[0]['name'] == '4:30 Buddha Room Hour Mic'
+    assert set(result[0]['duplicate_ids']) == {'prior-feed-id', calendar['id']}
+    assert {source['id'] for source in result[0]['sources']} == {'comediq-source', 'badslava-source'}
+    assert {record['id'] for record in result[0]['recurring_history']} == {'prior-feed-id', calendar['id']}
+    assert original == [feed, calendar]
+
+
+@pytest.mark.parametrize('fields', [
+    {'start_time': '17:30'}, {'date': '2026-10-28'}, {'address': '411 8th Ave'},
+    {'claimed': True}, {'curated': True}, {'hidden': True}, {'status': 'cancelled'},
+    {'frequency': 'biweekly'}, {'frequency': 'non-weekly'}, {'frequency': 'one-time'},
+    {'notes': 'Every other Tuesday'}, {'recurrence_anchor': '2026-10-27'},
+    {'excluded_dates': ['2026-11-03']}, {'overridden_fields': ['frequency']},
+])
+def test_private_buddha_pair_preserves_other_dates_schedules_and_protected_records(fields):
+    feed, calendar = private_buddha_pair()
+    feed.update(fields)
+    assert deduplicate_laughingbuddha_occurrences([feed, calendar]) == [feed, calendar]
+
+
+def test_private_buddha_pair_requires_current_unambiguous_provider_records():
+    feed, calendar = private_buddha_pair()
+    feed['sources'][0]['missing_count'] = 1
+    assert deduplicate_laughingbuddha_occurrences([feed, calendar]) == [feed, calendar]
+    feed['sources'][0]['missing_count'] = 0
+    second = {**feed, 'id': 'second-feed-session', 'name': 'Separate Buddha session'}
+    assert deduplicate_laughingbuddha_occurrences([feed, calendar, second]) == [feed, calendar, second]
+    protected = {**second, 'claimed': True}
+    assert deduplicate_laughingbuddha_occurrences([feed, calendar, protected]) == [feed, calendar, protected]
+
+
+@pytest.mark.parametrize('venue,address', [
+    ('The Stand', '116 E 16th St'), ('New York Comedy Club - UWS', '236 W 78th St'),
+    ('The Rose', '160 W 25th St'),
+])
+def test_shared_rooms_still_require_an_official_anchor(venue, address):
+    feed, calendar = private_buddha_pair()
+    for record in (feed, calendar):
+        record['venue'], record['address'] = venue, address
+    assert deduplicate_laughingbuddha_occurrences([feed, calendar]) == [feed, calendar]
+
+
 def test_only_directory_api_consolidates_and_management_and_dated_urls_remain(database, monkeypatch):
     password = secrets.token_urlsafe(24)
     monkeypatch.setenv('ADMIN_PASSWORD', password)
