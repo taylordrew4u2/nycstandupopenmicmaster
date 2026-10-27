@@ -50,7 +50,7 @@ with sync_playwright() as p:
         assert page.locator('#site-menu nav').evaluate('''el => {
             const items=[...el.children].map(e=>e.getBoundingClientRect());
             const names=[...el.children].map(e=>e.textContent.trim());
-            return JSON.stringify(names)===JSON.stringify(['Calendar','Host sign in','Submit a mic','About','Shop']) && items.every((r,i)=>r.left>=0 && r.right<=innerWidth && r.bottom<=innerHeight && r.height<40 && (!i || r.top>=items[i-1].bottom));
+            return JSON.stringify(names)===JSON.stringify(['Calendar','Text size','Host sign in','Submit a mic','About','Shop']) && items.every((r,i)=>r.left>=0 && r.right<=innerWidth && r.bottom<=innerHeight && r.height<40 && (!i || r.top>=items[i-1].bottom));
         }'''), (width,height,'menu items must stack and fit')
         page.locator('#site-menu summary').click()
         page.locator('.mic-title').first.click()

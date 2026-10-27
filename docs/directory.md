@@ -12,6 +12,9 @@
   Search and filters remain above the list. Choose **Mics**, **Map**, or **Both**
   to use the available space for the list, map, or the two together.
   Desktop results retain Previous/Next pages.
+- **Menu → Text size** offers Small, Standard, Large and Extra large text for mic
+  listings, details and map labels. Row heights grow with the text; the preference
+  is saved in the current browser. Navigation and filters keep their compact size.
 - While the map is visible, the list follows the area in view. Pan or zoom to narrow
   results; zoom out or use **NYC** to see the whole city. Hiding the map restores the
   full filtered list, including mics without coordinates.
