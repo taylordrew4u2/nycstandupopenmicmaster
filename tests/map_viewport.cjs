@@ -39,11 +39,17 @@ assert.equal(map.rows.length,4,'Viewport filtering must preserve rows so panning
 assert(map.focus('north'));
 assert.deepEqual(Array.from(map.visibleRows(),r=>r.id),['north']);
 assert.equal(notifications.length,2);
+assert.equal(map.popup.hidden,false);
+resize();
+assert.equal(map.popup.hidden,false,'An already drawn viewport must keep its newly focused popup');
+assert.equal(notifications.length,2,'A redundant resize notification must not redraw the viewport');
 map.reset();
 assert.deepEqual(Array.from(map.visibleRows(),r=>r.id),['center','north','south']);
 assert.equal(notifications.length,3);
 root.clientWidth=350;
+map.popup.hidden=false;
 resize();
+assert.equal(map.popup.hidden,true,'A real size change must dismiss the popup before redrawing');
 assert.equal(notifications.length,4,'Resizing the map must update the list viewport');
 
 // A pointer drag schedules a draw, and the resulting viewport notifies once.

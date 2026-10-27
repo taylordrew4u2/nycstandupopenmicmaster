@@ -29,7 +29,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 body:has(#view-directory:not([hidden])){height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
 body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidden}
 #view-directory{height:100%;min-height:0}
-.directory-section{height:100%;padding:6px;display:grid;grid-template-rows:auto minmax(0,1fr);gap:6px}
+.directory-section{height:100%;padding:6px;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:6px}
 .directory-controls{display:grid;grid-template-columns:minmax(100px,1fr) 130px 146px auto;gap:5px;min-width:0}
 .directory-controls input,.directory-controls select{height:30px;min-width:0;padding:4px 7px;border:1px solid #8098b3;background:#fff}
 .compact-button,.button.quiet,.map-controls button{border:1px solid #8799ae;background:linear-gradient(#fff,#e8e6dc);box-shadow:inset 1px 1px #fff;min-height:28px;padding:3px 9px;color:#20334a;border-radius:0;white-space:nowrap}
@@ -45,9 +45,13 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
 .map-popup>strong{font-size:11px;margin:0 20px 5px 0}.popup-mic{padding:5px 0;height:44px;overflow:hidden}
 .popup-mic small,.popup-mic span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;margin:0}.popup-close{font-size:20px}
 .popup-pages{display:flex;align-items:center;justify-content:space-between;gap:6px;padding-top:4px;font-size:10px}
-.results{display:grid;grid-template-rows:30px minmax(0,1fr);min-height:0;overflow:hidden;border:1px solid #a3b2c3;background:#fff}
-.results-toolbar{margin:0;padding:2px 5px;gap:4px;background:#f2f2ee;border-bottom:1px solid #b9c4d0;min-width:0}
+.results{display:grid;grid-template-rows:minmax(0,1fr);min-height:0;overflow:hidden;border:1px solid #a3b2c3;background:#fff}
+.results-toolbar{margin:0;padding:2px 5px;gap:4px;background:#f2f2ee;border:1px solid #b9c4d0;min-width:0;min-height:30px}
 .results-toolbar p{font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.directory-views{display:flex;align-items:center;gap:2px;flex:none}
+.directory-views .compact-button{min-height:24px;padding:2px 9px;font-size:11px}
+.directory-layout[data-view=list],.directory-layout[data-view=map]{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+.directory-section[data-view=map] .list-pagination{display:none}
 .list-pagination{display:flex;align-items:center;gap:4px;flex:none;font-size:10px}.list-pagination button{min-height:24px;height:24px;min-width:25px;padding:0 5px;font-size:18px;line-height:1}
 #page-count{min-width:31px;text-align:center}
 #cards{display:flex;flex-direction:column;gap:0;padding:0;min-height:0;overflow:hidden;--row-height:52px}
@@ -81,7 +85,7 @@ body:has(#view-directory:not([hidden])) #main{flex:1;min-height:0;overflow:hidde
  .directory-section{padding:4px;gap:4px}.directory-controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 56px;gap:4px}
  .directory-controls input{grid-column:1/3;grid-row:1;font-size:16px}#more-filters{grid-column:3;grid-row:1/3;padding:3px;min-width:0;font-size:11px}
  #day-filter{grid-column:1;grid-row:2}#borough-filter{grid-column:2;grid-row:2}.directory-controls select{font-size:12px;padding:3px}
- .directory-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) clamp(126px,32dvh,216px);gap:4px}.results{grid-template-rows:28px minmax(0,1fr)}
+ .directory-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) min(clamp(126px,32dvh,216px),max(46px,calc(100% - 126px)));gap:4px}
  #cards{--row-height:46px}#cards .card-main{grid-template-columns:54px minmax(0,1fr) 34px 26px;gap:6px;padding:3px 6px}.map-controls{top:6px;left:6px}.filter-options{gap:8px}
 }
 @media(max-height:480px) and (min-width:560px){
@@ -185,14 +189,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 .visitor-stats{padding:9px 12px;margin:10px 0;border:1px solid var(--line);background:#fff}.visitor-heading{display:flex;align-items:center;justify-content:space-between;font-size:12px}.visitor-counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:8px 0}.visitor-counts strong{display:block;font-size:21px;font-variant-numeric:tabular-nums}.visitor-counts span,.visitor-stats>small{font-size:10px;color:var(--muted)}@media(max-width:420px){.visitor-counts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
-/* Mobile list scrolling keeps search and the optional map in the viewport. */
-#map-toggle{display:none}
+/* Mobile list scrolling keeps search and the view choices in the viewport. */
 @media(max-width:650px),(max-width:950px) and (max-height:480px){
  #cards{overflow-y:auto;overscroll-behavior-y:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
  .list-pagination{display:none}
- #map-toggle{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;min-height:26px;padding:2px 7px}
- .directory-layout.map-collapsed{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
- .directory-layout.map-collapsed>.map-panel{display:none}
+ .results-toolbar{min-height:28px}
+ .directory-views .compact-button{padding:2px 7px}
 }
 
 /* Earlier starts today stay available, with upcoming mics visually stronger. */

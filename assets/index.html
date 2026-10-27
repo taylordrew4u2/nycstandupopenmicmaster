@@ -30,14 +30,23 @@
 <div class="status-strip" hidden><span id="directory-dot"></span><span id="directory-status"></span></div>
 <main id="main" tabindex="-1">
 <section id="view-directory">
-  <section id="listings" class="directory-section" aria-label="Open-mic listings">
+  <section id="listings" class="directory-section" data-view="both" aria-label="Open-mic listings">
     <div class="directory-controls" role="search">
       <input id="search" type="search" placeholder="Search mics or venues" aria-label="Search mics or venues" autocomplete="off">
       <select id="day-filter" aria-label="Day or date"></select>
       <select id="borough-filter" aria-label="Borough"><option value="all">All boroughs</option><option>Manhattan</option><option>Brooklyn</option><option>Queens</option><option>Bronx</option><option>Staten Island</option></select>
       <button id="more-filters" class="compact-button" data-action="filters">Filters</button>
     </div>
-    <div class="directory-layout">
+    <div class="results-toolbar">
+      <p id="result-count" role="status" aria-live="polite"></p>
+      <div class="directory-views" role="group" aria-label="Directory view">
+        <button type="button" class="compact-button" data-action="directory-view" data-view="list" aria-controls="map-panel mic-results" aria-pressed="false">Mics</button>
+        <button type="button" class="compact-button" data-action="directory-view" data-view="map" aria-controls="map-panel mic-results" aria-pressed="false">Map</button>
+        <button type="button" class="compact-button active" data-action="directory-view" data-view="both" aria-controls="map-panel mic-results" aria-pressed="true">Both</button>
+      </div>
+      <div class="list-pagination" aria-label="Listing pages"><button class="compact-button" data-action="previous-page" aria-label="Previous page">‹</button><span id="page-count" aria-live="polite"></span><button class="compact-button" data-action="next-page" aria-label="Next page">›</button></div>
+    </div>
+    <div class="directory-layout" data-view="both">
       <section id="map-panel" class="map-panel" aria-label="NYC open mic map">
         <div id="nyc-map" class="city-map" role="region" aria-label="Interactive NYC map. Drag to pan, pinch or double tap to zoom, or use the zoom buttons">
           <div class="tile-plane"></div><div class="pin-plane"></div>
@@ -48,8 +57,7 @@
           <div class="map-popup" hidden></div>
         </div>
       </section>
-      <section class="results" aria-label="Matching mics">
-        <div class="results-toolbar"><p id="result-count" role="status" aria-live="polite"></p><button id="map-toggle" class="compact-button" data-action="map-toggle" aria-controls="map-panel" aria-expanded="true">Hide map</button><div class="list-pagination" aria-label="Listing pages"><button class="compact-button" data-action="previous-page" aria-label="Previous page">‹</button><span id="page-count" aria-live="polite"></span><button class="compact-button" data-action="next-page" aria-label="Next page">›</button></div></div>
+      <section id="mic-results" class="results" aria-label="Matching mics">
         <div id="cards" class="mic-list"></div>
       </section>
     </div>

@@ -67,7 +67,7 @@ with sync_playwright() as p:
         results.append(metrics)
     page.set_viewport_size({'width':390,'height':844})
     page.wait_for_timeout(70)
-    page.locator('#map-toggle').click()
+    page.locator('[data-action="directory-view"][data-view="list"]').click()
     page.wait_for_timeout(70)
     assert page.locator('.mic-card').count()==21
     assert page.locator('.list-pagination').is_hidden()
