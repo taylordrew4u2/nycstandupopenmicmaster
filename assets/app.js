@@ -7,7 +7,9 @@ const BOROUGHS=['Manhattan','Brooklyn','Queens','Bronx','Staten Island'];
 const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const safeUrl=s=>{try{const u=new URL(s);return ['http:','https:'].includes(u.protocol)?u.href:'';}catch{return '';}};
 const external=(url,label,cls='')=>safeUrl(url)?`<a class="${cls}" href="${esc(safeUrl(url))}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`:esc(label);
-const nyToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const nyDateFormatter=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+const nyClockFormatter=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+const nyToday=()=>nyDateFormatter.format(new Date());
 const weekday=date=>(new Date(date+'T12:00:00Z').getUTCDay()+6)%7;
 const timeText=t=>{if(!t)return 'Not listed';const [h,m]=t.split(':').map(Number);return `${h%12||12}:${String(m).padStart(2,'0')} ${h>=12?'PM':'AM'}`;};
 const ago=n=>{if(!n)return 'Never';const d=Math.max(0,Date.now()/1000-n);return d<60?'Just now':d<3600?`${Math.floor(d/60)}m ago`:d<86400?`${Math.floor(d/3600)}h ago`:`${Math.floor(d/86400)}d ago`;};
@@ -52,7 +54,7 @@ function showLastSync(value){
 }
 async function loadSyncStatus(){try{const status=await api('/api/sync-status');showLastSync(status.last_sync_at);}catch{if($('#last-sync'))$('#last-sync').textContent='LAST SYNC AT unavailable';}}
 async function loadPublic(){
-  if(!map)map=new MicMap($('#nyc-map'),id=>details(id));
+  if(!map)map=new MicMap($('#nyc-map'),id=>details(id),()=>renderCards(true));
   if(!state.data.listings.length&&!state.demo)$('#cards').innerHTML='<p class="directory-loading" role="status">Loading mics…</p>';
   if(state.demo){state.data=demoData();renderDirectory();return;}
   try{state.data=await api('/api/public');renderDirectory();}catch(err){$('#directory-status').textContent='Directory unavailable';$('#cards').innerHTML=blank('Could not load the directory.',esc(err.message),button('Try again','refresh'));}
@@ -104,6 +106,16 @@ const claimLabel=r=>r.claimed?'Host claimed':r.venue_confirmed?'Venue confirmed'
 const claimBadge=r=>`<span class="claim-status ${r.claimed||r.venue_confirmed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':r.venue_confirmed?'Listed on an official venue website. A host can still claim this mic.':'No approved host has claimed this mic.'}">${claimLabel(r)}</span>`;
 function scheduleLabel(r){if(r.frequency==='non-weekly')return 'Non-weekly · check schedule';if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||generatedSourceDate(r)||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
 const datesUnconfirmed=r=>(r.frequency==='non-weekly'||(isBiweekly(r)&&!r.recurrence_anchor))&&(!r.date||generatedSourceDate(r));
+function hasStartedToday(row,now=new Date()){
+  if(row.status!=='scheduled'||datesUnconfirmed(row)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(row.start_time||''))return false;
+  const parts=Object.fromEntries(nyClockFormatter.formatToParts(now).map(p=>[p.type,p.value]));
+  const today=`${parts.year}-${parts.month}-${parts.day}`;
+  return (!state.date||state.date===today)&&occursOnDate(row,today)&&row.start_time<`${parts.hour}:${parts.minute}`;
+}
+function refreshPastMics(){
+  const now=new Date(),rows=new Map(state.data.listings.map(r=>[String(r.id),r]));
+  $$('#cards .mic-card').forEach(el=>{const row=rows.get(el.dataset.mic);el.classList.toggle('past-mic',!!row&&hasStartedToday(row,now));});
+}
 function scheduleDay(r,long=false){
   if(datesUnconfirmed(r))return long?(DAYS[recurrenceDay(r)]||'Day not listed')+' · dates unconfirmed':'Dates unconfirmed';
   return new Date(nextDate(r)+'T12:00:00Z').toLocaleDateString('en-US',{weekday:long?'long':'short',month:'short',day:'numeric',timeZone:'UTC'});
@@ -167,39 +179,49 @@ function renderDirectory(){
   const active=state.cost!=='all'||state.signup!=='all'||state.claimStatus!=='all'||state.timeFrom||state.timeTo||state.hideOffWeek;
   $('#more-filters').classList.toggle('active',active);
   $('#more-filters').textContent=active?'Filters •':'Filters';
-  renderCards();
-  if(!map)map=new MicMap($('#nyc-map'),id=>details(id));
+  if(!map)map=new MicMap($('#nyc-map'),id=>details(id),()=>renderCards(true));
   map.setRows(filtered().filter(r=>r.status==='scheduled'&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude)));
+  renderCards();
 }
-function renderCards(){
-  const rows=filtered(),box=$('#cards');
-  const key=JSON.stringify([state.date,state.day,state.borough,state.search,state.cost,state.signup,state.claimStatus,state.timeFrom,state.timeTo,state.sort,state.hideOffWeek]);
-  if(key!==state.resultKey){state.page=0;state.resultKey=key;}
+const scrollableList=()=>window.matchMedia('(max-width:650px),(max-width:950px) and (max-height:480px)').matches;
+const mapAreaActive=()=>!!(map?.root.clientWidth&&map?.root.clientHeight);
+function directoryRows(){
+  // The map retains all matches in filter order; panning only changes the view.
+  return mapAreaActive()?map.visibleRows():filtered();
+}
+function renderCards(viewportOnly=false){
+  const rows=directoryRows(),box=$('#cards'),scrolling=scrollableList();
+  const key=JSON.stringify([state.date,state.day,state.borough,state.search,state.cost,state.signup,state.claimStatus,state.timeFrom,state.timeTo,state.sort,state.hideOffWeek,scrolling,rows.map(r=>r.id)]);
+  if(viewportOnly&&key===state.resultKey)return;
+  if(key!==state.resultKey){state.page=0;box.scrollTop=0;state.resultKey=key;}
   const rowHeight=parseFloat(getComputedStyle(box).getPropertyValue('--row-height'))||52;
-  const size=Math.max(1,Math.floor(box.clientHeight/rowHeight));
+  const size=scrolling?Math.max(1,rows.length):Math.max(1,Math.floor(box.clientHeight/rowHeight));
   if(size!==state.pageSize){state.page=Math.floor(state.page*state.pageSize/size);state.pageSize=size;}
   const pages=Math.max(1,Math.ceil(rows.length/size));state.page=Math.max(0,Math.min(state.page,pages-1));
   const start=state.page*size;
-  $('#result-count').textContent=`${rows.length} mic${rows.length===1?'':'s'}`;
+  $('#result-count').textContent=`${rows.length} mic${rows.length===1?'':'s'}${mapAreaActive()?' in map area':''}`;
   $('#page-count').textContent=`${state.page+1}/${pages}`;
   $('[data-action="previous-page"]').disabled=state.page===0;
   $('[data-action="next-page"]').disabled=state.page>=pages-1;
   $('.list-pagination').hidden=pages===1;
-  box.innerHTML=rows.length?rows.slice(start,start+size).map(card).join(''):state.data.listings.length?blank('No matching mics.','',button('Reset filters','reset')):blank('No mics yet.','',`<button class="demo-toggle" data-action="demo">View demo</button>`);
+  const scrollTop=box.scrollTop;
+  box.innerHTML=rows.length?rows.slice(start,start+size).map(card).join(''):mapAreaActive()&&filtered().length?blank('No mics in this map area.','',button('Show all NYC','map-reset')):state.data.listings.length?blank('No matching mics.','',button('Reset filters','reset')):blank('No mics yet.','',`<button class="demo-toggle" data-action="demo">View demo</button>`);
+  if(scrolling)box.scrollTop=scrollTop;
 }
 function card(r){
   const cost=r.cost===0?'Free':r.cost!=null?`$${r.cost}`:r.cost_text?'See fee':'—';
   const located=r.status==='scheduled'&&Number.isFinite(r.latitude)&&Number.isFinite(r.longitude);
   const title=micTitle(r),venue=`${r.venue} · ${r.borough}`;
-  return `<article class="mic-card ${isBiweekly(r)?'biweekly-mic':''}" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):esc(scheduleDay(r))}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button></div><div class="mic-meta">${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}${scheduleBadge(r)}${claimBadge(r)}</div><small class="row-updated" title="${updatedAt(r)?esc(new Date(updatedAt(r)*1000).toLocaleString()):'Not recorded'}">Updated ${esc(updatedText(r))}</small></div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
+  return `<article class="mic-card ${isBiweekly(r)?'biweekly-mic':''} ${hasStartedToday(r)?'past-mic':''}" data-mic="${esc(r.id)}"><div class="card-main"><div class="mic-time"><strong>${esc(timeText(r.start_time))}</strong><span class="mic-day">${r.status!=='scheduled'?esc(r.status):esc(scheduleDay(r))}</span></div><div class="mic-info"><div class="mic-heading"><button class="mic-title" title="${esc(title)}" data-action="details" data-id="${esc(r.id)}">${esc(title)}</button></div><div class="mic-meta">${located?`<button class="venue-line" title="${esc(venue)}" data-action="locate" data-id="${esc(r.id)}" aria-label="Show ${esc(venue)} on map">${esc(venue)}</button>`:`<div class="venue-line" title="${esc(venue)}">${esc(venue)}</div>`}${scheduleBadge(r)}${claimBadge(r)}</div><small class="row-updated" title="${updatedAt(r)?esc(new Date(updatedAt(r)*1000).toLocaleString()):'Not recorded'}">Updated ${esc(updatedText(r))}</small></div><div class="mic-cost" title="${esc(r.cost_text||'Entry fee not listed')}" aria-label="Entry fee: ${esc(r.cost_text||cost)}">${cost}</div></div></article>`;
 }
 function filtersDialog(){
   const option=(v,t,current)=>`<option value="${v}" ${current===v?'selected':''}>${t}</option>`;
   modal('Filters',`<div class="filter-options"><label>Entry fee<select id="cost">${[['all','Any price'],['free','Free'],['5','$5 or less'],['10','$10 or less']].map(([v,t])=>option(v,t,state.cost)).join('')}</select></label><label>Sort<select id="sort">${[['time','Date & time'],['price','Lowest fee'],['name','Mic name']].map(([v,t])=>option(v,t,state.sort)).join('')}</select></label><label>Host status<select id="claim-filter">${[['all','All mics'],['claimed','Host claimed'],['venue','Venue confirmed'],['unclaimed','Unclaimed (including venue confirmed)']].map(([v,t])=>option(v,t,state.claimStatus)).join('')}</select></label><label>Biweekly mics<select id="biweekly-filter">${option('all','Show all',state.hideOffWeek?'current':'all')}${option('current','Hide mics off this week',state.hideOffWeek?'current':'all')}</select><small>Pin colors: green = confirmed; blue = unclaimed; purple = biweekly. Unconfirmed dates stay visible.</small></label><label>Start time from<input id="time-from" type="time" value="${esc(state.timeFrom)}"></label><label>Start time until<input id="time-to" type="time" value="${esc(state.timeTo)}"></label></div>`,button('Reset','reset')+button('Done','close','','primary'));
 }
-function findMic(id){return state.data.listings.find(r=>r.id===id)||state.community?.listings?.find(r=>r.id===id)||state.owner?.listings?.find(r=>r.id===id);}
+function findMic(id){return state.data.listings.find(r=>r.id===id||r.duplicate_ids?.includes(id))||state.community?.listings?.find(r=>r.id===id)||state.owner?.listings?.find(r=>r.id===id);}
 function details(id,tab='mic',page=0){
   const r=findMic(id);if(!r)return;
+  id=r.id;
   const item=(label,value)=>`<div class="detail-item"><small>${label}</small><strong>${esc(value)}</strong></div>`;
   const tabs=['mic','hosts','notes','sources','link'].map(t=>`<button class="compact-button ${tab===t?'active':''}" data-action="detail-tab" data-id="${esc(id)}" data-tab="${t}" aria-pressed="${tab===t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('');
   let body='';
@@ -226,6 +248,7 @@ function details(id,tab='mic',page=0){
 function submission(id,kind){
   if(state.demo){toast('These are fictional examples. Use a real listing to submit a report or claim.');return;}
   const r=findMic(id);if(!r)return;
+  id=r.id;
   if(kind==='claim'&&r.claimed){modal('This mic has a host.',`<p>The host can sign in to edit this listing. For ownership disputes or corrections, submit a fix for the administrator.</p><a class="button primary" href="/owner">Host login</a>`,button('Submit a fix','submit-fix',id));return;}
   const report=kind==='report',claim=kind==='claim';
   modal(claim?'Claim this mic':report?'Report an inactive mic':'Submit a correction',`<p>${esc(r.name)} · ${esc(r.venue)}</p><form id="submission-form" data-id="${esc(id)}" data-kind="${kind}">${field(report?'Your name (optional)':'Your name','name','','text',!report)}${field(claim?'Email for your host account':'Email (optional, for follow-up)','email','','email',claim)}${textField(claim?'How can we verify you run this mic?':report?'Why does this mic no longer run? Add a source or the last date it ran.':'What needs fixing? Include the correct details and a source link.','message','',true)}<div class="honeypot" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off"></label></div><p class="form-helper">${claim?'You will receive a private status link. Save it and check for approval; password setup appears there when approved.':report?'The administrator reviews reports before hiding a mic. Your report will not remove it automatically.':'The administrator reviews corrections before updating listings.'} Your contact details are not published.</p><button class="button primary" type="submit">${claim?'Submit claim':report?'Send report':'Send correction'}</button></form>`);
@@ -464,6 +487,7 @@ document.addEventListener('click',async e=>{
       el.textContent=collapsed?'Show map':'Hide map';
       el.setAttribute('aria-expanded',String(!collapsed));
       map?.hide();
+      requestAnimationFrame(()=>renderCards());
     }
     if(action==='map-reset')map?.reset();
     if(action==='details')details(id);
@@ -543,6 +567,9 @@ async function boot(){
 }
 new ResizeObserver(()=>{if(!$('#view-directory').hidden)renderCards();}).observe($('#cards'));
 boot();
+// Refresh dimming without replacing cards or interrupting native list scrolling.
+setInterval(()=>{if(!document.hidden)refreshPastMics();},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPastMics();});
 // Refresh the browser's saved snapshot periodically; source checks run on the server.
 setInterval(()=>{if(!document.hidden&&!state.demo&&location.pathname==='/')loadPublic();},60000);
 

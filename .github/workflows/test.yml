@@ -37,3 +37,16 @@ jobs:
       - run: python -m pytest -q tests
         env:
           TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
+      - name: Directory date and map logic
+        run: |
+          node tests/calendar_logic.cjs
+          node tests/past_mic_logic.cjs
+          node tests/map_viewport.cjs
+          node tests/map_individual_pins.cjs
+      - name: Install browser for directory checks
+        run: python -m playwright install --with-deps chromium
+      - name: Directory layout, scrolling and map interaction
+        run: |
+          python scripts/build_preview.py
+          python tests/directory_layout_checks.py
+          python tests/browser_directory_scrolling.py

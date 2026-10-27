@@ -20,6 +20,7 @@ from .fetcher import SafeFetcher, FetchError, MAX_BYTES, validate_url
 from .models import SourceConfig, SourceUpdate, PreviewCommit, Login, AdminPasswordUpdate, VisibilityUpdate
 from .admin_auth import AdminAuth
 from .parsers import extract, FIELDS
+from .laughingbuddha import supports as laughingbuddha_source, fetch_feed as laughingbuddha_feed
 from .store import Store, digest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -54,7 +55,7 @@ def create_app(db_path=None):
             raise HTTPException(400, 'This source was replaced by an uploaded snapshot and cannot auto-sync.')
         try:
             from .comediq import supports as comediq_source
-            rolling_dates = comediq_source(source['config']['url'])
+            rolling_dates = comediq_source(source['config']['url']) or laughingbuddha_source(source['config']['url'])
             result = await fetcher.fetch(source['config']['url'], None if rolling_dates else source['etag'], None if rolling_dates else source['modified'])
             validators = {'etag': result['headers'].get('Etag') or result['headers'].get('ETag'),
                           'modified': result['headers'].get('Last-Modified')}
@@ -64,6 +65,8 @@ def create_app(db_path=None):
                     result = await fetcher.fetch(source['config']['url'])
                 else:
                     return store.success(source_id, [], validators, unchanged=True)
+            if source['config']['kind'] == 'auto' and laughingbuddha_source(source['config']['url']):
+                result['content'] = await laughingbuddha_feed(fetcher)
             content_hash = digest(result['content'])
             validators['hash'] = content_hash
             if content_hash == source['content_hash'] and source['state'] != 'review' and not rolling_dates:
@@ -218,7 +221,7 @@ def create_app(db_path=None):
 
     @app.get('/api/public')
     async def public():
-        return store.public_data()
+        return store.public_data(deduplicate=True)
 
     @app.get('/api/sources', dependencies=[Depends(admin)])
     async def sources():
@@ -237,6 +240,8 @@ def create_app(db_path=None):
         try:
             config.url = validate_url(config.url)
             fetched = await fetcher.fetch(config.url)
+            if config.kind == 'auto' and laughingbuddha_source(config.url):
+                fetched['content'] = await laughingbuddha_feed(fetcher)
             parsed = await asyncio.to_thread(extract, fetched['content'], config, fetched['headers'].get('Content-Type', ''))
             validators = {'etag': fetched['headers'].get('Etag') or fetched['headers'].get('ETag'),
                           'modified': fetched['headers'].get('Last-Modified'), 'hash': digest(fetched['content'])}

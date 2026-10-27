@@ -1,4 +1,4 @@
-"""Verify the compact directory fits viewports and pagination reaches every mic.
+"""Verify compact layouts, mobile scrolling, and desktop pagination.
 Run scripts/build_preview.py first. External map tiles are excluded from this check.
 """
 import json
@@ -11,7 +11,7 @@ OUT = ROOT / 'test-results'
 OUT.mkdir(exist_ok=True)
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path=os.getenv('CHROMIUM_PATH', '/usr/bin/chromium'), args=['--no-sandbox'], headless=True)
+    browser = p.chromium.launch(executable_path=os.getenv('CHROMIUM_PATH'), args=['--no-sandbox'], headless=True)
     page = browser.new_page()
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
@@ -28,21 +28,29 @@ with sync_playwright() as p:
             const last=box.lastElementChild?.getBoundingClientRect(), bounds=box.getBoundingClientRect();
             return {width:innerWidth,height:innerHeight,bodyWidth:root.scrollWidth,bodyHeight:root.scrollHeight,
                 listHeight:box.clientHeight,listContentHeight:box.scrollHeight,rows:box.children.length,
+                mobile:matchMedia('(max-width:650px),(max-width:950px) and (max-height:480px)').matches,
                 lastFits:!last||last.bottom<=bounds.bottom+1,mapHeight:map.clientHeight,mapWidth:map.clientWidth,
                 controlsVisible:[...document.querySelectorAll('.directory-controls > *')].every(el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;})};
         }''')
         assert page.locator('#cards .claim-status').count()==metrics['rows']
         assert metrics['bodyWidth'] <= width, metrics
         assert metrics['bodyHeight'] <= height, metrics
-        assert metrics['listContentHeight'] <= metrics['listHeight']+1, metrics
-        assert metrics['lastFits'] and metrics['controlsVisible'] and metrics['rows'] >= 1, metrics
+        if metrics['mobile']:
+            assert page.locator('.list-pagination').is_hidden(), metrics
+            assert page.locator('#cards').evaluate('(el)=>getComputedStyle(el).overflowY')=='auto', metrics
+            assert metrics['rows']==page.evaluate('directoryRows().length'), metrics
+        else:
+            assert metrics['listContentHeight'] <= metrics['listHeight']+1, metrics
+            assert metrics['lastFits'], metrics
+        assert metrics['controlsVisible'] and metrics['rows'] >= 1, metrics
         assert metrics['mapHeight'] >= 120 and metrics['mapWidth'] >= 190, metrics
         assert page.locator('#cards .row-updated').count()==metrics['rows']
         assert page.locator('#cards .card-main').evaluate_all('(els)=>els.every(e=>e.scrollWidth<=e.clientWidth+1)')
         page.locator('#site-menu summary').click()
         assert page.locator('#site-menu nav').evaluate('''el => {
             const items=[...el.children].map(e=>e.getBoundingClientRect());
-            return items.length===4 && items.every((r,i)=>r.left>=0 && r.right<=innerWidth && r.bottom<=innerHeight && r.height<40 && (!i || r.top>=items[i-1].bottom));
+            const names=[...el.children].map(e=>e.textContent.trim());
+            return JSON.stringify(names)===JSON.stringify(['Calendar','Host sign in','Submit a mic','About','Shop']) && items.every((r,i)=>r.left>=0 && r.right<=innerWidth && r.bottom<=innerHeight && r.height<40 && (!i || r.top>=items[i-1].bottom));
         }'''), (width,height,'menu items must stack and fit')
         page.locator('#site-menu summary').click()
         page.locator('.mic-title').first.click()
@@ -58,6 +66,14 @@ with sync_playwright() as p:
         if width in (1440,390): page.screenshot(path=str(OUT/f'compact-{width}.png'))
         results.append(metrics)
     page.set_viewport_size({'width':390,'height':844})
+    page.wait_for_timeout(70)
+    page.locator('#map-toggle').click()
+    page.wait_for_timeout(70)
+    assert page.locator('.mic-card').count()==21
+    assert page.locator('.list-pagination').is_hidden()
+    page.locator('#cards').evaluate('(el)=>el.scrollTop=el.scrollHeight')
+    assert page.locator('.mic-card').last.evaluate('el=>{const r=el.getBoundingClientRect(),b=el.parentElement.getBoundingClientRect();return r.bottom<=b.bottom+1&&r.top>=b.top;}')
+    page.set_viewport_size({'width':1440,'height':900})
     page.wait_for_timeout(70)
     page.evaluate('state.page=0;renderCards()')
     seen=[]
@@ -104,16 +120,15 @@ with sync_playwright() as p:
     assert page.get_by_role('link',name='Host sign in',exact=True).is_visible()
     assert page.get_by_role('link',name='About',exact=True).get_attribute('href')=='/about'
     page.locator('#site-menu summary').click()
-    # Nearby venues may cluster at city scale, but anchor each pin tip at the venue at street scale.
+    # Every mic retains its own pin, anchored at its venue at street scale.
     page.evaluate("""() => {
       const base=state.data.listings[0];
       map.rows=[{...base,id:'pin-a',latitude:40.72,longitude:-73.99},
                 {...base,id:'pin-b',latitude:40.7201,longitude:-73.9899}];
       map.center=[40.72,-73.99];map.zoom=14;map.draw();
     }""")
-    assert page.locator('.mic-cluster').count()==1
-    page.locator('.mic-cluster').click()
-    assert page.evaluate('map.zoom')==16
+    assert page.locator('.mic-pin').count()==2
+    page.evaluate('map.zoom=16;map.draw()')
     assert page.locator('.mic-pin').count()==2
     assert page.locator('.mic-cluster').count()==0
     offsets=page.evaluate("""() => {
@@ -121,7 +136,7 @@ with sync_playwright() as p:
       return [...map.pins.querySelectorAll('.mic-pin')].map((pin,i)=>{
         const r=pin.getBoundingClientRect(),[x,y]=map.project(map.rows[i].latitude,map.rows[i].longitude);
         return Math.hypot((r.left+r.right)/2-bounds.left-map.root.clientLeft-(x-cx+map.root.clientWidth/2),
-                          (r.bottom-1)-bounds.top-map.root.clientTop-(y-cy+map.root.clientHeight/2));
+                          r.bottom-bounds.top-map.root.clientTop-(y-cy+map.root.clientHeight/2));
       });
     }""")
     assert max(offsets)<1, offsets
