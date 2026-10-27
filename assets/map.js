@@ -3,8 +3,8 @@
 'use strict';
 let micPinSequence=0;
 class MicMap {
-  constructor(root, onSelect) {
-    this.root = root; this.onSelect = onSelect; this.zoom = 10;
+  constructor(root, onSelect, onViewportChange) {
+    this.root = root; this.onSelect = onSelect; this.onViewportChange = onViewportChange; this.zoom = 10;
     this.center = [40.705, -73.975]; this.initialFit = false; this.rows = []; this.tiles = new Map();
     this.plane = root.querySelector('.tile-plane'); this.pins = root.querySelector('.pin-plane');
     this.popup = root.querySelector('.map-popup'); this.loaded = 0; this.failed = 0;
@@ -101,6 +101,17 @@ class MicMap {
   reset(){this.fitCity();this.hide();this.draw();}
   hide(){this.popup.hidden=true;}
   setRows(rows){this.rows=rows;this.hide();this.draw();}
+  visibleRows(rows=this.rows){
+    const w=this.root.clientWidth,h=this.root.clientHeight;if(!w||!h)return [];
+    const [cx,cy]=this.project(...this.center),left=cx-w/2,top=cy-h/2;
+    // Filter by the pin's actual location, not the extra drawing margin used
+    // to keep partially clipped pin artwork smooth at the edge of the map.
+    return rows.filter(row=>{
+      if(!Number.isFinite(row.latitude)||!Number.isFinite(row.longitude))return false;
+      const [x,y]=this.project(row.latitude,row.longitude);
+      return x>=left&&x<=left+w&&y>=top&&y<=top+h;
+    });
+  }
   focus(id){
     const row=this.rows.find(r=>r.id===id);
     if(!row||!Number.isFinite(row.latitude)||!Number.isFinite(row.longitude))return false;
@@ -112,6 +123,9 @@ class MicMap {
   draw(){
     const w=this.root.clientWidth,h=this.root.clientHeight;if(!w||!h)return;
     if(!this.initialFit)this.fitCity();
+    const viewportKey=[w,h,this.zoom,...this.center].join(',');
+    const viewportChanged=this.viewportKey!==undefined&&this.viewportKey!==viewportKey;
+    this.viewportKey=viewportKey;
     const [cx,cy]=this.project(...this.center),left=cx-w/2,top=cy-h/2;
     const tileZoom=Math.floor(this.zoom),scale=2**(this.zoom-tileZoom),tileSize=256*scale;
     const minX=Math.floor(left/tileSize),minY=Math.floor(top/tileSize),maxX=Math.floor((left+w)/tileSize),maxY=Math.floor((top+h)/tileSize),keep=new Set();
@@ -142,6 +156,9 @@ class MicMap {
       button.addEventListener('click',()=>this.onSelect(row.id));
       this.pins.append(button);
     }
+    // Row updates redraw markers without changing the viewport. Keeping this
+    // notification separate prevents list/map filtering from feeding back.
+    if(viewportChanged&&typeof this.onViewportChange==='function')this.onViewportChange(this);
   }
   show(rows,x,y,page=0){
     this.popup.replaceChildren();const close=document.createElement('button');close.className='popup-close';close.textContent='×';close.setAttribute('aria-label','Close map popup');close.onclick=()=>this.hide();this.popup.append(close);

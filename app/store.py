@@ -8,7 +8,9 @@ import threading
 import uuid
 from collections import Counter, defaultdict
 from contextlib import contextmanager
+from datetime import date
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .parsers import key
 
@@ -90,6 +92,182 @@ def recurring_source_key(source, payload):
         return None
     # A newly connected source is a separate authority even if its URL matches.
     return source['id'], provider, matched[1]
+
+
+def _directory_duplicate_row(chosen, duplicates):
+    """Keep aliases and full source history for a directory presentation merge."""
+    aliases = set(chosen.get('duplicate_ids', []))
+    history = list(chosen.get('recurring_history', []))
+    all_sources = list(chosen.get('sources', []))
+    source_keys = {(s.get('id'), s.get('url'), s.get('kind')) for s in all_sources}
+    for row in duplicates:
+        aliases.add(row['id'])
+        aliases.update(row.get('duplicate_ids', []))
+        history.append({'id': row['id'], 'date': row['date'], 'sources': row.get('sources', [])})
+        history.extend(row.get('recurring_history', []))
+        for source in row.get('sources', []):
+            source_key = (source.get('id'), source.get('url'), source.get('kind'))
+            if source_key not in source_keys:
+                all_sources.append(source)
+                source_keys.add(source_key)
+    return {**chosen, 'sources': all_sources, 'duplicate_ids': sorted(aliases),
+            'recurring_history': sorted(history, key=lambda row: (row['date'], row['id']))}
+
+
+def deduplicate_generated_occurrences(listings):
+    """Present Comediq's generated weekly dates once without changing records.
+
+    A Comediq UUID identifies the series; a rolled-over generated date does not
+    identify a new weekly session. Historical observations remain available to
+    management, ownership reconciliation and dated pages. Only their directory
+    representation is consolidated, with the old IDs and provenance retained.
+    """
+    from .comediq import FEED_URL
+
+    groups = defaultdict(list)
+    for row in listings:
+        if (row.get('claimed') or row.get('curated') or row.get('hidden')
+                or row.get('frequency') not in (None, '', 'weekly')
+                or row.get('recurrence_anchor')
+                or 'date' in row.get('overridden_fields', [])):
+            continue
+        references = [source for source in row.get('sources', [])
+                      if source.get('url') == FEED_URL and source.get('kind') != 'upload']
+        # Multiple provider observations in one existing public group are
+        # ambiguous. Keep them intact rather than guessing which UUID owns it.
+        if len(references) != 1:
+            continue
+        source = references[0]
+        matched = re.fullmatch(r'comediq:([0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}):(\d{4}-\d{2}-\d{2})',
+                               source.get('external_id') or row.get('external_id') or '')
+        if not matched or matched[2] != row.get('date'):
+            continue
+        try:
+            generated_date = date.fromisoformat(row['date'])
+        except (TypeError, ValueError):
+            continue
+        location = venue_slot(row)
+        if not location:
+            continue
+        weekday = row.get('weekday')
+        if not isinstance(weekday, int) or not 0 <= weekday < 7:
+            weekday = generated_date.weekday()
+        identity = (source['id'], matched[1], weekday, row.get('start_time'),
+                    row.get('venue'), location[0], row.get('borough'),
+                    row.get('frequency') or '', tuple(sorted(row.get('excluded_dates', []))),
+                    row.get('status'))
+        groups[identity].append((row, source))
+
+    replacements, suppressed = {}, set()
+    for items in groups.values():
+        if len(items) < 2:
+            continue
+        current = [(row, source) for row, source in items if not source.get('missing_count')]
+        # The importer emits one generated date per weekly UUID. If a source
+        # instead actively publishes several, preserve those independent dates.
+        if len(current) > 1:
+            continue
+        chosen, _ = current[0] if current else max(items, key=lambda item: (
+            item[1].get('checked_at') or 0, item[0].get('checked_at') or 0,
+            item[0]['date'], item[0]['id']))
+        duplicates = [row for row, _ in items if row['id'] != chosen['id']
+                      and all(source.get('missing_count', 0) > 0 for source in row.get('sources', []))]
+        if not duplicates:
+            continue
+        suppressed.update(row['id'] for row in duplicates)
+        replacements[chosen['id']] = _directory_duplicate_row(chosen, duplicates)
+    return [replacements.get(row['id'], row) for row in listings if row['id'] not in suppressed]
+
+
+def deduplicate_laughingbuddha_occurrences(listings):
+    """Join known Laughing Buddha organizer listings to exact official events.
+
+    This deliberately requires an official dated anchor, an identified organizer
+    and one of its verified NYC rooms. A shared venue/time alone is insufficient.
+    """
+    from .badslava import supports as badslava_source
+    from .comediq import supports as comediq_source
+    from .laughingbuddha import supports as laughingbuddha_source
+
+    rooms = {
+        'thebuddharoom': ('buddha', {'4108ave', '4108ave2floor', '4108avenewyork', '4108ave2floornewyork'}),
+        'laughingbuddhacomedy': ('buddha', {'4108ave', '4108ave2floor', '4108avenewyork', '4108ave2floornewyork'}),
+        'thestand': ('stand', {'116e16st', '116e16stnewyork'}),
+        'newyorkcomedyclubuws': ('nycc-uws', {'236w78st', '236w78stnewyork'}),
+        'nyccuws': ('nycc-uws', {'236w78st', '236w78stnewyork'}),
+        'therose': ('rose', {'160w25st', '160w25stnewyork'}),
+    }
+
+    def slot(row):
+        room = rooms.get(key(row.get('venue', '')))
+        location = venue_slot(row)
+        if not room or not location or location[0] not in room[1] or location[1] != 'manhattan':
+            return None
+        try:
+            date.fromisoformat(row['date'])
+        except (TypeError, ValueError):
+            return None
+        return room[0], row['date'], row.get('start_time')
+
+    def protected(row):
+        return row.get('claimed') or row.get('curated') or row.get('hidden')
+
+    def official(row):
+        return (row.get('frequency') == 'one-time'
+                and any(source.get('kind') != 'upload' and laughingbuddha_source(source.get('url', ''))
+                        and not source.get('missing_count') for source in row.get('sources', [])))
+
+    def same_organizer(row):
+        if key(row.get('venue', '')) in ('thebuddharoom', 'laughingbuddhacomedy'):
+            return True
+        if re.search(r'\b(?:laughing\s+buddha|buddha)\b', row.get('name', ''), re.I):
+            return True
+        signup = urlsplit(row.get('signup_url') or '')
+        return ((signup.hostname or '').removeprefix('www.') == 'laughingbuddhacomedy.com'
+                or ((signup.hostname or '').removeprefix('www.') == 'tickettailor.com'
+                    and signup.path.startswith('/events/laughingbuddhacomedy/')))
+
+    groups = defaultdict(list)
+    for row in listings:
+        if not protected(row) and (identity := slot(row)):
+            groups[identity].append(row)
+    replacements, suppressed = {}, set()
+    for rows in groups.values():
+        anchors = [row for row in rows if official(row)]
+        if len(anchors) != 1:
+            continue
+        chosen = anchors[0]
+        duplicates = [row for row in rows if row['id'] != chosen['id']
+                      and same_organizer(row) and row.get('status') == chosen.get('status')
+                      and not row.get('excluded_dates') and not row.get('recurrence_anchor')
+                      and any(source.get('kind') != 'upload'
+                              and (badslava_source(source.get('url', '')) or comediq_source(source.get('url', '')))
+                              for source in row.get('sources', []))]
+        repeated_sources = {source_id for source_id, count in Counter(
+            source['id'] for row in duplicates for source in row.get('sources', [])
+            if badslava_source(source.get('url', '')) or comediq_source(source.get('url', ''))).items()
+            if count > 1}
+        # Two distinct sessions actively supplied by the same provider cannot
+        # be identified as one event from room/date/time alone.
+        duplicates = [row for row in duplicates if not any(source['id'] in repeated_sources
+                                                          for source in row.get('sources', []))]
+        if not duplicates:
+            continue
+        merged = _directory_duplicate_row(chosen, duplicates)
+        # Exact room/address matching permits retaining an existing mapped pin
+        # and public host links when the official ticket page omits them.
+        located = next((row for row in duplicates if row.get('latitude') is not None
+                        and row.get('longitude') is not None), None)
+        if merged.get('latitude') is None and located:
+            for field in ('latitude', 'longitude', 'map_status'):
+                if field in located:
+                    merged[field] = located[field]
+        for field in ('host_names', 'host_socials'):
+            if not merged.get(field):
+                merged[field] = next((row[field] for row in duplicates if row.get(field)), '')
+        replacements[chosen['id']] = merged
+        suppressed.update(row['id'] for row in duplicates)
+    return [replacements.get(row['id'], row) for row in listings if row['id'] not in suppressed]
 
 class Store:
     def __init__(self, path):
@@ -285,7 +463,7 @@ class Store:
         return max((s['last_success'] for s in sources if s['config'].get('url')
                     and s['config']['kind'] != 'upload' and s['last_success']), default=None)
 
-    def public_data(self, include_hidden=False):
+    def public_data(self, include_hidden=False, deduplicate=False):
         now = time.time()
         sources = {s['id']: s for s in self.list_sources()}
         with self.connect() as c:
@@ -401,6 +579,7 @@ class Store:
             for o, payload, s in items:
                 all_sources.append({'id': s['id'], 'name': s['config']['name'], 'url': s['config']['url'],
                                     'kind': s['config']['kind'], 'checked_at': o['last_seen'],
+                                    'external_id': payload.get('external_id'), 'date': payload.get('date'),
                                     'state': s['state'] if s['enabled'] or s['config']['kind']=='upload' else 'paused',
                                     'missing_count': o['missing_count'], 'priority': s['config']['priority'],
                                     'values': {f: payload.get(f) for f in conflicts}})
@@ -437,6 +616,9 @@ class Store:
                              'overridden_fields':list(json.loads(curated['payload'])) if curated else [],
                              'checked_at': observation['last_seen'], 'updated_at': observation['updated'],
                              'conflicts': conflicts, 'stale': bool(stale), 'host_confirmed_at': host_confirmed})
+        if deduplicate:
+            listings = deduplicate_generated_occurrences(listings)
+            listings = deduplicate_laughingbuddha_occurrences(listings)
         return {'listings': listings, 'source_count': len(sources), 'last_check': max((s['last_success'] or 0 for s in sources.values()), default=None),
                 'last_sync_at': self.last_live_sync(sources.values()),
                 'timezone': 'America/New_York', 'mode': 'live' if sources else 'empty'}
