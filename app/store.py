@@ -182,8 +182,9 @@ def deduplicate_generated_occurrences(listings):
 def deduplicate_laughingbuddha_occurrences(listings):
     """Join known Laughing Buddha organizer listings to exact official events.
 
-    This deliberately requires an official dated anchor, an identified organizer
-    and one of its verified NYC rooms. A shared venue/time alone is insufficient.
+    Shared rooms require an official dated anchor and an identified organizer.
+    The private Buddha Room also permits one unambiguous current calendar/feed
+    pair at the same exact date and time.
     """
     from .badslava import supports as badslava_source
     from .comediq import supports as comediq_source
@@ -228,15 +229,44 @@ def deduplicate_laughingbuddha_occurrences(listings):
                     and signup.path.startswith('/events/laughingbuddhacomedy/')))
 
     groups = defaultdict(list)
+    protected_slots = set()
     for row in listings:
-        if not protected(row) and (identity := slot(row)):
-            groups[identity].append(row)
+        if identity := slot(row):
+            if protected(row):
+                protected_slots.add(identity)
+            else:
+                groups[identity].append(row)
     replacements, suppressed = {}, set()
-    for rows in groups.values():
+    for identity, rows in groups.items():
         anchors = [row for row in rows if official(row)]
-        if len(anchors) != 1:
+        if len(anchors) == 1:
+            chosen = anchors[0]
+        elif not anchors and identity[0] == 'buddha' and identity not in protected_slots and len(rows) == 2:
+            # This is the producer's private room, unlike shared clubs such as
+            # The Stand. Require one current record from each known provider.
+            providers = []
+            for row in rows:
+                if (row.get('frequency') not in (None, '', 'weekly')
+                        or row.get('status') != 'scheduled' or row.get('excluded_dates')
+                        or row.get('recurrence_anchor')
+                        or set(row.get('overridden_fields', [])) & {'frequency', 'date', 'weekday', 'start_time', 'recurrence_anchor', 'excluded_dates'}
+                        or re.search(r'\b(?:bi[ -]?weekly|every other|non[ -]?weekly)\b',
+                                     row.get('name', '') + ' ' + row.get('notes', ''), re.I)):
+                    break
+                references = [source for source in row.get('sources', [])
+                              if source.get('kind') != 'upload' and not source.get('missing_count')
+                              and (badslava_source(source.get('url', '')) or comediq_source(source.get('url', '')))]
+                if len(references) != 1:
+                    break
+                providers.append('badslava' if badslava_source(references[0]['url']) else 'comediq')
+            if set(providers) != {'badslava', 'comediq'}:
+                continue
+            chosen = max(rows, key=lambda row: (
+                key(row.get('name', '')) not in ('openmic', 'mic'),
+                max((source.get('priority', 0) for source in row.get('sources', [])), default=0),
+                row.get('checked_at') or 0))
+        else:
             continue
-        chosen = anchors[0]
         duplicates = [row for row in rows if row['id'] != chosen['id']
                       and same_organizer(row) and row.get('status') == chosen.get('status')
                       and not row.get('excluded_dates') and not row.get('recurrence_anchor')
