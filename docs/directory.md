@@ -14,8 +14,9 @@
 - While the map is visible, the list follows the area in view. Pan or zoom to narrow
   results; zoom out or use **NYC** to see the whole city. Hiding the map restores the
   full filtered list, including mics without coordinates.
-- Mics whose start time has passed today in `America/New_York` appear dimmer and
-  remain selectable. Upcoming starts, other dates and unconfirmed dates stay bright.
+- Mics whose start time has passed today in `America/New_York` appear dimmer in
+  both the list and map pins, and remain selectable. Upcoming starts, other dates
+  and unconfirmed dates stay bright. Dimming refreshes automatically as time passes.
 - Mic details use **Mic**, **Hosts**, **Notes**, **Sources** and **Link** tabs; long
   notes and source lists are paginated.
 - Saved mics are stored only in the visitor's browser. CSV export is available.

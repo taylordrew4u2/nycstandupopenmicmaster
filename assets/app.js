@@ -114,7 +114,7 @@ function hasStartedToday(row,now=new Date()){
 }
 function refreshPastMics(){
   const now=new Date(),rows=new Map(state.data.listings.map(r=>[String(r.id),r]));
-  $$('#cards .mic-card').forEach(el=>{const row=rows.get(el.dataset.mic);el.classList.toggle('past-mic',!!row&&hasStartedToday(row,now));});
+  $$('#cards .mic-card, #nyc-map .mic-pin').forEach(el=>{const row=rows.get(el.dataset.mic||el.dataset.micId);el.classList.toggle('past-mic',!!row&&hasStartedToday(row,now));});
 }
 function scheduleDay(r,long=false){
   if(datesUnconfirmed(r))return long?(DAYS[recurrenceDay(r)]||'Day not listed')+' · dates unconfirmed':'Dates unconfirmed';
@@ -567,7 +567,7 @@ async function boot(){
 }
 new ResizeObserver(()=>{if(!$('#view-directory').hidden)renderCards();}).observe($('#cards'));
 boot();
-// Refresh dimming without replacing cards or interrupting native list scrolling.
+// Refresh dimming in place without interrupting list scrolling or map gestures.
 setInterval(()=>{if(!document.hidden)refreshPastMics();},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPastMics();});
 // Refresh the browser's saved snapshot periodically; source checks run on the server.

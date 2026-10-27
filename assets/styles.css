@@ -198,6 +198,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 /* Earlier starts today stay available, with upcoming mics visually stronger. */
 #cards .past-mic .card-main{opacity:.58}
 #cards .past-mic:focus-within .card-main,#cards .past-mic:hover .card-main{opacity:1}
+.mic-pin.past-mic{opacity:.58}
+.mic-pin.past-mic:hover,.mic-pin.past-mic:focus-visible{opacity:1}
 
 .biweekly-mic{border-left:3px solid #7c3ca3!important}
 .biweekly-badge{font-size:9px;color:#652787;background:#f1e7f8;padding:1px 3px;white-space:nowrap}

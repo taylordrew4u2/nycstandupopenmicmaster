@@ -230,6 +230,67 @@ with sync_playwright() as pw:
     assert page.locator('#submission-form').get_attribute('data-id') == 'time-0'
     page.get_by_role('button', name='Close dialog').click()
     page.evaluate('state.demo=true')
+
+    # Map pins share the New York clock rule and remain interactive when dimmed.
+    page.clock.set_fixed_time(datetime(2026, 10, 27, 22, 0, tzinfo=timezone.utc))
+    page.evaluate('''() => {
+        const base={...state.data.listings[0],duplicate_ids:[]};
+        Object.assign(state,{date:null,day:'all'});
+        state.data.listings=[
+          {...base,id:'pin-past',name:'Map Past',start_time:'17:00',latitude:40.72,longitude:-73.993},
+          {...base,id:'pin-now',name:'Map Now',start_time:'18:00',latitude:40.72,longitude:-73.99},
+          {...base,id:'pin-next',name:'Map Next',start_time:'19:00',latitude:40.72,longitude:-73.987},
+          {...base,id:'pin-invalid',name:'Map Invalid',start_time:'25:00',latitude:40.722,longitude:-73.99}
+        ];
+        map.center=[40.72,-73.99];map.zoom=15;map.initialFit=true;renderDirectory();
+    }''')
+    page.locator('#map-toggle').click()
+    settle()
+    page.mouse.move(0, 0)
+    past_pin = page.locator('.mic-pin[data-mic-id="pin-past"]')
+    now_pin = page.locator('.mic-pin[data-mic-id="pin-now"]')
+    next_pin = page.locator('.mic-pin[data-mic-id="pin-next"]')
+    invalid_pin = page.locator('.mic-pin[data-mic-id="pin-invalid"]')
+    assert page.locator('.mic-pin').count() == 4
+    assert past_pin.evaluate('(el)=>el.classList.contains("past-mic")&&getComputedStyle(el).opacity==="0.58"')
+    for pin in (now_pin, next_pin, invalid_pin):
+        assert pin.evaluate('(el)=>!el.classList.contains("past-mic")&&getComputedStyle(el).opacity==="1"')
+
+    page.evaluate("state.date='2026-11-03';renderDirectory()")
+    assert page.locator('#nyc-map .past-mic').count() == 0
+    assert page.locator('.mic-pin').evaluate_all('els=>els.every(el=>getComputedStyle(el).opacity==="1")')
+    page.locator('#day-filter').select_option('2026-10-27')
+    assert page.locator('#nyc-map .past-mic').count() == 1
+
+    # Refresh existing nodes as time/status changes, without resetting the view.
+    view_before_tick = page.evaluate('({center:map.center.slice(),zoom:map.zoom})')
+    page.evaluate('window.pinBeforeTimeTick=document.querySelector(".mic-pin[data-mic-id=pin-now]")')
+    page.clock.set_fixed_time(datetime(2026, 10, 27, 22, 1, tzinfo=timezone.utc))
+    page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
+    assert now_pin.evaluate('(el)=>el===window.pinBeforeTimeTick&&el.classList.contains("past-mic")&&getComputedStyle(el).opacity==="0.58"')
+    assert page.evaluate('({center:map.center.slice(),zoom:map.zoom})') == view_before_tick
+    assert next_pin.evaluate('(el)=>getComputedStyle(el).opacity') == '1'
+    assert invalid_pin.evaluate('(el)=>getComputedStyle(el).opacity') == '1'
+    page.evaluate("findMic('pin-past').status='cancelled';document.dispatchEvent(new Event('visibilitychange'))")
+    assert past_pin.evaluate('(el)=>!el.classList.contains("past-mic")&&getComputedStyle(el).opacity==="1"')
+    page.evaluate("findMic('pin-past').status='scheduled';document.dispatchEvent(new Event('visibilitychange'))")
+    # The earlier map drag suppresses accidental clicks for 500 ms. A fast
+    # browser can finish these clock checks before that real gesture guard ends.
+    page.wait_for_function('map.pointers.size===0&&!map.gesture&&performance.now()>=map.suppressClickUntil')
+    past_pin.tap()
+    assert page.locator('#modal').is_visible()
+    assert page.locator('#modal .modal-head h2').inner_text() == 'Map Past'
+    page.get_by_role('button', name='Close dialog').click()
+    page.locator('#map-toggle').click()
+    settle()
+    assert page.locator('#nyc-map').is_hidden()
+    page.locator('#map-toggle').click()
+    settle()
+    page.mouse.move(0, 0)
+    assert past_pin.evaluate('(el)=>getComputedStyle(el).opacity') == '0.58'
+    assert now_pin.evaluate('(el)=>getComputedStyle(el).opacity') == '0.58'
+    assert next_pin.evaluate('(el)=>getComputedStyle(el).opacity') == '1'
+    assert page.evaluate('({center:map.center.slice(),zoom:map.zoom})') == view_before_tick
     assert not errors, errors
     browser.close()
 
@@ -239,6 +300,7 @@ print(json.dumps({
     'filters': 'search, borough, and start-time filters preserved',
     'map': 'list follows zoom, pan, reset, and map visibility',
     'past_mics': 'New York clock, exact start minute, future date, and clock refresh verified',
+    'past_pins': 'map pin dimming, date filtering, in-place refresh, status guards, and taps verified',
     'shared_links': 'historical IDs use current details, links, and submission targets',
     'page_errors': errors,
 }, indent=2))

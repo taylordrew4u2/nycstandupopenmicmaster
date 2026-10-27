@@ -139,6 +139,7 @@ class MicMap {
     this.pins.replaceChildren();
     if(this.zoom<=11)for(const [name,lat,lng]of [['Manhattan',40.795,-73.988],['Brooklyn',40.635,-73.95],['Queens',40.735,-73.78],['Bronx',40.87,-73.86],['Staten Island',40.555,-74.16]]){const [x,y]=this.project(lat,lng);const label=document.createElement('span');label.className='map-borough';label.textContent=name;label.style.left=`${x-left}px`;label.style.top=`${y-top}px`;this.pins.append(label);}
     // One marker per mic. Never average or offset its supplied coordinates.
+    const now=new Date();
     for(const row of this.rows){
       if(!Number.isFinite(row.latitude)||!Number.isFinite(row.longitude))continue;
       const [px,py]=this.project(row.latitude,row.longitude),x=px-left,y=py-top;
@@ -146,6 +147,7 @@ class MicMap {
       const button=document.createElement('button');button.type='button';button.className='mic-pin';
       button.classList.toggle('confirmed-pin',!!(row.claimed||row.venue_confirmed));
       button.classList.toggle('biweekly-pin',typeof isBiweekly==='function'&&isBiweekly(row));
+      button.classList.toggle('past-mic',typeof hasStartedToday==='function'&&hasStartedToday(row,now));
       button.dataset.micId=row.id;
       const pinId='pushpin-'+(++micPinSequence);
       button.innerHTML=`<svg viewBox="0 0 44 44" aria-hidden="true" focusable="false"><defs><linearGradient id="${pinId}-steel"><stop stop-color="#666"/><stop offset=".4" stop-color="#f4f4f4"/><stop offset=".7" stop-color="#aaa"/><stop offset="1" stop-color="#555"/></linearGradient><radialGradient id="${pinId}-head" cx="65%" cy="25%" r="80%"><stop stop-color="#fff"/><stop offset=".16" stop-color="currentColor"/><stop offset=".63" stop-color="currentColor"/><stop offset="1" stop-color="#15202b"/></radialGradient></defs><path d="M21 26H23L22.6 39Q22.4 43 22 44Q21.6 43 21.4 39Z" fill="url(#${pinId}-steel)"/><circle class="pushpin-head" cx="22" cy="21" r="6" style="fill:url(#${pinId}-head)"/><ellipse class="pushpin-glint" cx="24.5" cy="18" rx="1.1" ry=".8" transform="rotate(35 24.5 18)"/></svg>`;
