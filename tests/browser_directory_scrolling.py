@@ -42,9 +42,22 @@ with sync_playwright() as pw:
             '(els, attr) => els.map(el => el.getAttribute(attr)).sort()', attribute
         )
 
-    page.locator('#map-toggle').click()
-    settle()
-    assert page.locator('#map-toggle').get_attribute('aria-expanded') == 'false'
+    def card_order():
+        return page.locator('#cards .mic-card').evaluate_all('(els)=>els.map(el=>el.dataset.mic)')
+
+    def set_view(view):
+        page.locator(f'[data-action="directory-view"][data-view="{view}"]').click()
+        settle()
+        selected = page.locator('[data-action="directory-view"][aria-pressed="true"]')
+        assert selected.count() == 1 and selected.get_attribute('data-view') == view
+        assert page.locator('#cards').is_visible() == (view != 'map')
+        assert page.locator('#nyc-map').is_visible() == (view != 'list')
+        assert page.locator('[data-action="directory-view"]').evaluate_all('''els=>els.every(el=>{
+            const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight;
+        })''')
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight')
+
+    set_view('list')
     assert page.locator('.mic-card').count() == 21
     assert len(set(ids())) == 21
     assert page.locator('.list-pagination').is_hidden()
@@ -90,13 +103,9 @@ with sync_playwright() as pw:
 
     # Keep a modest offset that fits with the map both shown and hidden.
     page.locator('#cards').evaluate('(el) => el.scrollTop = 100')
-    page.locator('#map-toggle').click()
-    settle()
-    assert page.locator('#map-toggle').get_attribute('aria-expanded') == 'true'
-    assert page.locator('#nyc-map').is_visible()
+    set_view('both')
     assert page.locator('#cards').evaluate('(el) => el.scrollTop') == 100
-    page.locator('#map-toggle').click()
-    settle()
+    set_view('list')
     assert page.locator('#cards').evaluate('(el) => el.scrollTop') == 100
 
     # Existing filtering resets list position and retains every matching result.
@@ -113,6 +122,21 @@ with sync_playwright() as pw:
     page.get_by_role('button', name='Done', exact=True).click()
     assert page.locator('.mic-card').count() == 7
     assert all('7:00' in text for text in page.locator('.mic-time').all_text_contents())
+    page.locator('#day-filter').select_option('1')
+    page.locator('#borough-filter').select_option('Queens')
+    page.locator('#search').fill('New Material')
+    assert page.locator('.mic-card').count() == 1
+    filter_snapshot = page.evaluate('({date:state.date,day:state.day,borough:state.borough,search:state.search,from:state.timeFrom,to:state.timeTo})')
+    for view in ('map', 'both', 'list'):
+        set_view(view)
+        assert page.evaluate('({date:state.date,day:state.day,borough:state.borough,search:state.search,from:state.timeFrom,to:state.timeTo})') == filter_snapshot
+        if view != 'map':
+            assert card_order() == ['demo-1-1']
+        else:
+            assert ids('.mic-pin', 'data-mic-id') == ['demo-1-1']
+    page.locator('#day-filter').select_option('all')
+    page.locator('#borough-filter').select_option('all')
+    page.locator('#search').fill('')
     page.evaluate("Object.assign(state,{timeFrom:'',timeTo:''});renderDirectory()")
 
     # Phone rotation retains continuous scrolling; desktop still uses pages.
@@ -124,7 +148,6 @@ with sync_playwright() as pw:
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
     page.set_viewport_size({'width': 1440, 'height': 900})
     settle()
-    page.evaluate('map.reset()')
     assert page.locator('.list-pagination').is_visible()
     assert page.locator('.mic-card').count() < 21
     seen = []
@@ -134,12 +157,19 @@ with sync_playwright() as pw:
             break
         page.locator('[data-action="next-page"]').click()
     assert len(seen) == len(set(seen)) == 21
+    page.locator('#search').fill('New Material')
+    desktop_filters = page.evaluate('({date:state.date,day:state.day,borough:state.borough,search:state.search,from:state.timeFrom,to:state.timeTo})')
+    for view in ('map', 'both', 'list'):
+        set_view(view)
+        assert page.evaluate('({date:state.date,day:state.day,borough:state.borough,search:state.search,from:state.timeFrom,to:state.timeTo})') == desktop_filters
+        if view != 'map':
+            assert all('New Material' in title for title in page.locator('.mic-title').all_text_contents())
+    page.locator('#search').fill('')
 
     # Three nearby pins and one distant pin make map/list membership explicit.
     page.set_viewport_size({'width': 390, 'height': 844})
     settle()
-    page.locator('#map-toggle').click()
-    settle()
+    set_view('both')
     page.mouse.move(0, 0)
     page.evaluate('''() => {
         const base=state.data.listings[0];
@@ -166,13 +196,11 @@ with sync_playwright() as pw:
     assert ids() == ['area-d']
     page.locator('#search').fill('Area A')
     assert page.locator('.blank-state').is_visible()
-    page.locator('#map-toggle').click()
-    settle()
+    set_view('list')
     assert ids() == ['area-a']
     page.locator('#search').fill('')
     assert len(ids()) == 4
-    page.locator('#map-toggle').click()
-    settle()
+    set_view('both')
     assert ids() == ['area-d']
 
     # A real map pan also updates the list, and empty areas stay usable.
@@ -193,28 +221,44 @@ with sync_playwright() as pw:
 
     # Browser timezone differs from New York: 22:00Z is 18:00 in NYC and
     # 07:00 the next day in Tokyo. Only earlier starts today in NYC are dimmed.
-    page.locator('#map-toggle').click()
-    settle()
+    set_view('list')
     page.evaluate('''() => {
         const base=state.data.listings[0];
         state.data.listings=Array.from({length:21},(_,i)=>({...base,
           id:'time-'+i,name:'Time '+i,weekday:1,date:null,frequency:'weekly',
-          start_time:i===0?'17:00':i===1?'18:00':'19:00'}));
+          start_time:i===0?'17:00':i===1?'18:00':'19:00',cost:i===0?0:i===1?10:i===2?5:20}));
         renderDirectory();
     }''')
     assert page.locator('[data-mic="time-0"] .card-main').evaluate('(el)=>getComputedStyle(el).opacity') == '0.58'
     assert page.locator('[data-mic="time-1"] .card-main').evaluate('(el)=>getComputedStyle(el).opacity') == '1'
     assert page.locator('[data-mic="time-2"] .card-main').evaluate('(el)=>getComputedStyle(el).opacity') == '1'
     assert page.locator('.mic-card').count() == 21
+    assert card_order()[0] == 'time-1' and card_order()[-1] == 'time-0'
+    page.locator('#more-filters').click()
+    page.locator('#sort').select_option('name')
+    page.get_by_role('button', name='Done', exact=True).click()
+    titles = page.locator('.mic-title').all_text_contents()
+    assert card_order()[-1] == 'time-0' and titles[:-1] == sorted(titles[:-1])
+    page.locator('#more-filters').click()
+    page.locator('#sort').select_option('price')
+    page.get_by_role('button', name='Done', exact=True).click()
+    assert card_order()[:2] == ['time-2', 'time-1'] and card_order()[-1] == 'time-0'
+    page.locator('#more-filters').click()
+    page.locator('#sort').select_option('time')
+    page.get_by_role('button', name='Done', exact=True).click()
     page.evaluate("state.date='2026-11-03';renderDirectory()")
-    assert page.locator('.past-mic').count() == 0
+    assert page.locator('#cards .past-mic').count() == 0
+    assert card_order()[:2] == ['time-0', 'time-1']
     page.locator('#day-filter').select_option('2026-10-27')
-    assert page.locator('.past-mic').count() == 1
+    assert page.locator('#cards .past-mic').count() == 1
     page.locator('#cards').evaluate('(el)=>el.scrollTop=100')
+    page.evaluate('window.cardBeforeTimeTick=document.querySelector(".mic-card[data-mic=time-1]")')
     page.clock.set_fixed_time(datetime(2026, 10, 27, 22, 1, tzinfo=timezone.utc))
     page.evaluate("document.dispatchEvent(new Event('visibilitychange'))")
     assert page.locator('[data-mic="time-1"] .card-main').evaluate('(el)=>getComputedStyle(el).opacity') == '0.58'
     assert page.locator('#cards').evaluate('(el)=>el.scrollTop') == 100
+    assert card_order()[0] == 'time-2' and card_order()[-2:] == ['time-0', 'time-1']
+    assert page.locator('[data-mic="time-1"]').evaluate('(el)=>el===window.cardBeforeTimeTick')
 
     # Historical shared IDs resolve to the displayed row's current action target.
     page.evaluate("state.data.listings[0].duplicate_ids=['historical-id'];details('historical-id')")
@@ -244,8 +288,7 @@ with sync_playwright() as pw:
         ];
         map.center=[40.72,-73.99];map.zoom=15;map.initialFit=true;renderDirectory();
     }''')
-    page.locator('#map-toggle').click()
-    settle()
+    set_view('both')
     page.mouse.move(0, 0)
     past_pin = page.locator('.mic-pin[data-mic-id="pin-past"]')
     now_pin = page.locator('.mic-pin[data-mic-id="pin-now"]')
@@ -281,11 +324,8 @@ with sync_playwright() as pw:
     assert page.locator('#modal').is_visible()
     assert page.locator('#modal .modal-head h2').inner_text() == 'Map Past'
     page.get_by_role('button', name='Close dialog').click()
-    page.locator('#map-toggle').click()
-    settle()
-    assert page.locator('#nyc-map').is_hidden()
-    page.locator('#map-toggle').click()
-    settle()
+    set_view('list')
+    set_view('both')
     page.mouse.move(0, 0)
     assert past_pin.evaluate('(el)=>getComputedStyle(el).opacity') == '0.58'
     assert now_pin.evaluate('(el)=>getComputedStyle(el).opacity') == '0.58'
@@ -298,8 +338,10 @@ print(json.dumps({
     'mobile': '21 unique results reachable with native touch scrolling',
     'rotation': 'portrait and landscape scrolling; desktop pagination preserved',
     'filters': 'search, borough, and start-time filters preserved',
+    'layout_modes': 'Mics, Map, and Both work on phones and desktop while retaining filters',
     'map': 'list follows zoom, pan, reset, and map visibility',
     'past_mics': 'New York clock, exact start minute, future date, and clock refresh verified',
+    'order': 'upcoming first, already-started today last; sort options and timer reorder verified',
     'past_pins': 'map pin dimming, date filtering, in-place refresh, status guards, and taps verified',
     'shared_links': 'historical IDs use current details, links, and submission targets',
     'page_errors': errors,

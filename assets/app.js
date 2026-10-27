@@ -18,6 +18,21 @@ try{localStorage.removeItem('miclist-saved');}catch{}
 const state={data:{listings:[],source_count:0,mode:'empty'},demo:!!window.MICLIST_PREVIEW,date:nyToday(),day:'all',borough:'all',search:'',cost:'all',signup:'all',claimStatus:'all',hideOffWeek:false,timeFrom:'',timeTo:'',sort:'time',adminTab:'sources',admin:null,community:null,owner:null,preview:null};
 let map;
 state.page=0;state.pageSize=1;state.resultKey='';
+const directoryViews=['list','map','both'];
+state.directoryView='both';
+try{const saved=localStorage.getItem('miclist-directory-view');if(directoryViews.includes(saved))state.directoryView=saved;}catch{}
+function setDirectoryView(view,{persist=true,refresh=true}={}){
+  if(!directoryViews.includes(view))return false;
+  state.directoryView=view;
+  $('.directory-layout').dataset.view=view;
+  $('.directory-section').dataset.view=view;
+  $('#map-panel').hidden=view==='list';
+  $('#mic-results').hidden=view==='map';
+  $$('[data-action="directory-view"]').forEach(button=>{const selected=button.dataset.view===view;button.setAttribute('aria-pressed',String(selected));button.classList.toggle('active',selected);});
+  if(persist){try{localStorage.setItem('miclist-directory-view',view);}catch{}}
+  if(refresh){map?.hide();map?.draw();renderCards();}
+  return true;
+}
 async function api(path,options={}){
   if(window.MICLIST_PREVIEW)throw Error('This file is a read-only interface preview. Run the included website to use the backend.');
   const opt={credentials:'same-origin',...options,headers:{'X-Requested-With':'MicList',...(options.headers||{})}};
@@ -91,13 +106,13 @@ function occurs(row){
   if(state.day==='all')return true;
   return dated?weekday(row.date)===Number(state.day):recurrenceDay(row)===Number(state.day);
 }
-function nextDate(row){
+function nextDate(row,today=nyToday()){
   if(row.frequency==='non-weekly'&&(!row.date||generatedSourceDate(row)))return '9999-12-31';
   if(state.date)return state.date;
   if(row.date&&!generatedSourceDate(row))return row.date;
   const day=recurrenceDay(row);
   if(day===null)return '9999-12-31';
-  const today=nyToday(),d=new Date(today+'T12:00:00Z');
+  const d=new Date(today+'T12:00:00Z');
   d.setUTCDate(d.getUTCDate()+(day-weekday(today)+7)%7);
   for(let i=0;i<53;i++){const date=d.toISOString().slice(0,10);if(occursOnDate(row,date))return date;d.setUTCDate(d.getUTCDate()+7);}
   return '9999-12-31';
@@ -106,14 +121,28 @@ const claimLabel=r=>r.claimed?'Host claimed':r.venue_confirmed?'Venue confirmed'
 const claimBadge=r=>`<span class="claim-status ${r.claimed||r.venue_confirmed?'is-claimed':''}" title="${r.claimed?'An approved mic owner can update this listing.':r.venue_confirmed?'Listed on an official venue website. A host can still claim this mic.':'No approved host has claimed this mic.'}">${claimLabel(r)}</span>`;
 function scheduleLabel(r){if(r.frequency==='non-weekly')return 'Non-weekly · check schedule';if(r.frequency==='one-time')return 'Pop-up mic (not recurring)';if(isBiweekly(r))return 'Biweekly';if(r.frequency==='weekly'||generatedSourceDate(r)||/\b(?:weekly|every week)\b/i.test(r.notes||'')||(!r.date&&Number.isInteger(r.weekday)))return 'Weekly';return 'Schedule unconfirmed';}
 const datesUnconfirmed=r=>(r.frequency==='non-weekly'||(isBiweekly(r)&&!r.recurrence_anchor))&&(!r.date||generatedSourceDate(r));
-function hasStartedToday(row,now=new Date()){
-  if(row.status!=='scheduled'||datesUnconfirmed(row)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(row.start_time||''))return false;
+function nyClock(now=new Date()){
   const parts=Object.fromEntries(nyClockFormatter.formatToParts(now).map(p=>[p.type,p.value]));
-  const today=`${parts.year}-${parts.month}-${parts.day}`;
-  return (!state.date||state.date===today)&&occursOnDate(row,today)&&row.start_time<`${parts.hour}:${parts.minute}`;
+  return {date:`${parts.year}-${parts.month}-${parts.day}`,time:`${parts.hour}:${parts.minute}`};
+}
+function todayOrder(row,clock){
+  if(row.status!=='scheduled'||datesUnconfirmed(row)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(row.start_time||''))return 1;
+  if((state.date&&state.date!==clock.date)||!occursOnDate(row,clock.date))return 1;
+  return row.start_time<clock.time?2:0;
+}
+function hasStartedToday(row,now=new Date()){
+  return todayOrder(row,nyClock(now))===2;
+}
+function sortDirectoryRows(rows,now=new Date()){
+  const clock=nyClock(now);
+  // Keep the selected sort within each group, with today's remaining starts first.
+  return rows.map(row=>({row,group:todayOrder(row,clock),dateTime:nextDate(row,clock.date)+(row.start_time||'')})).sort((a,b)=>
+    a.group-b.group||(state.sort==='name'?micTitle(a.row).localeCompare(micTitle(b.row)):state.sort==='price'?(a.row.cost??999)-(b.row.cost??999):a.dateTime.localeCompare(b.dateTime))
+  ).map(item=>item.row);
 }
 function refreshPastMics(){
   const now=new Date(),rows=new Map(state.data.listings.map(r=>[String(r.id),r]));
+  if(!$('#view-directory').hidden)renderCards(true,true,now);
   $$('#cards .mic-card, #nyc-map .mic-pin').forEach(el=>{const row=rows.get(el.dataset.mic||el.dataset.micId);el.classList.toggle('past-mic',!!row&&hasStartedToday(row,now));});
 }
 function scheduleDay(r,long=false){
@@ -158,7 +187,7 @@ function syncScheduleForm(form,changed=false){
   if(day)day.closest('.field').hidden=frequency==='one-time';
   if(anchor){anchor.closest('.field').hidden=frequency!=='biweekly';anchor.required=form.id==='mic-proposal-form'&&frequency==='biweekly';if(changed&&frequency!=='biweekly')anchor.value='';}
 }
-function filtered(){return state.data.listings.filter(r=>{
+function filtered(now=new Date()){return sortDirectoryRows(state.data.listings.filter(r=>{
   if(!state.date&&state.hideOffWeek&&isBiweekly(r)&&biweeklyThisWeek(r)===false)return false;
   if(state.claimStatus==='venue'&&!r.venue_confirmed)return false;if(state.claimStatus==='claimed'&&!r.claimed)return false;if(state.claimStatus==='unclaimed'&&r.claimed)return false;
   if(!occurs(r))return false;if(state.borough!=='all'&&r.borough!==state.borough)return false;
@@ -166,7 +195,7 @@ function filtered(){return state.data.listings.filter(r=>{
   if(state.search&&!`${r.name} ${r.venue} ${r.address} ${r.borough} ${r.neighborhood} ${DAYS[recurrenceDay(r)]||''} ${r.date||''} ${r.date?dateText(r.date):''}`.toLowerCase().includes(state.search))return false;
   if(state.cost==='free'&&r.cost!==0)return false;if(['5','10'].includes(state.cost)&&(r.cost===null||r.cost>Number(state.cost)))return false;
   if(state.signup!=='all'&&!String(r.signup_method).toLowerCase().includes(state.signup))return false;return true;
-}).sort((a,b)=>state.sort==='name'?micTitle(a).localeCompare(micTitle(b)):state.sort==='price'?(a.cost??999)-(b.cost??999):(nextDate(a)+a.start_time).localeCompare(nextDate(b)+b.start_time));}
+}),now);}
 function renderDirectory(){
   showLastSync(state.demo?null:state.data.last_sync_at);
   $('#preview-banner').hidden=!state.demo;
@@ -185,15 +214,15 @@ function renderDirectory(){
 }
 const scrollableList=()=>window.matchMedia('(max-width:650px),(max-width:950px) and (max-height:480px)').matches;
 const mapAreaActive=()=>!!(map?.root.clientWidth&&map?.root.clientHeight);
-function directoryRows(){
-  // The map retains all matches in filter order; panning only changes the view.
-  return mapAreaActive()?map.visibleRows():filtered();
+function directoryRows(now=new Date()){
+  // Panning uses the map's cached matches; the clock can change their order.
+  return mapAreaActive()?sortDirectoryRows(map.visibleRows(),now):filtered(now);
 }
-function renderCards(viewportOnly=false){
-  const rows=directoryRows(),box=$('#cards'),scrolling=scrollableList();
+function renderCards(viewportOnly=false,preservePosition=false,now=new Date()){
+  const rows=directoryRows(now),box=$('#cards'),scrolling=scrollableList();
   const key=JSON.stringify([state.date,state.day,state.borough,state.search,state.cost,state.signup,state.claimStatus,state.timeFrom,state.timeTo,state.sort,state.hideOffWeek,scrolling,rows.map(r=>r.id)]);
   if(viewportOnly&&key===state.resultKey)return;
-  if(key!==state.resultKey){state.page=0;box.scrollTop=0;state.resultKey=key;}
+  if(key!==state.resultKey){if(!preservePosition){state.page=0;box.scrollTop=0;}state.resultKey=key;}
   const rowHeight=parseFloat(getComputedStyle(box).getPropertyValue('--row-height'))||52;
   const size=scrolling?Math.max(1,rows.length):Math.max(1,Math.floor(box.clientHeight/rowHeight));
   if(size!==state.pageSize){state.page=Math.floor(state.page*state.pageSize/size);state.pageSize=size;}
@@ -205,7 +234,17 @@ function renderCards(viewportOnly=false){
   $('[data-action="next-page"]').disabled=state.page>=pages-1;
   $('.list-pagination').hidden=pages===1;
   const scrollTop=box.scrollTop;
-  box.innerHTML=rows.length?rows.slice(start,start+size).map(card).join(''):mapAreaActive()&&filtered().length?blank('No mics in this map area.','',button('Show all NYC','map-reset')):state.data.listings.length?blank('No matching mics.','',button('Reset filters','reset')):blank('No mics yet.','',`<button class="demo-toggle" data-action="demo">View demo</button>`);
+  if(preservePosition&&rows.length){
+    const existing=new Map($$('.mic-card',box).map(el=>[el.dataset.mic,el])),active=document.activeElement;
+    const desired=rows.slice(start,start+size).map(row=>{
+      if(existing.has(String(row.id)))return existing.get(String(row.id));
+      const template=document.createElement('template');template.innerHTML=card(row);return template.content.firstElementChild;
+    });
+    const keep=new Set(desired);
+    [...box.children].forEach(el=>{if(!keep.has(el))el.remove();});
+    desired.forEach((el,i)=>{if(box.children[i]!==el)box.insertBefore(el,box.children[i]||null);});
+    if(active&&box.contains(active)&&document.activeElement!==active)active.focus({preventScroll:true});
+  }else box.innerHTML=rows.length?rows.slice(start,start+size).map(card).join(''):mapAreaActive()&&filtered().length?blank('No mics in this map area.','',button('Show all NYC','map-reset')):state.data.listings.length?blank('No matching mics.','',button('Reset filters','reset')):blank('No mics yet.','',`<button class="demo-toggle" data-action="demo">View demo</button>`);
   if(scrolling)box.scrollTop=scrollTop;
 }
 function card(r){
@@ -482,13 +521,7 @@ document.addEventListener('click',async e=>{
     if(action==='filters')filtersDialog();
     if(action==='previous-page'||action==='next-page'){state.page+=action==='next-page'?1:-1;renderCards();}
     if(action==='detail-tab')details(id,el.dataset.tab,Number(el.dataset.page||0));
-    if(action==='map-toggle'){
-      const collapsed=$('.directory-layout').classList.toggle('map-collapsed');
-      el.textContent=collapsed?'Show map':'Hide map';
-      el.setAttribute('aria-expanded',String(!collapsed));
-      map?.hide();
-      requestAnimationFrame(()=>renderCards());
-    }
+    if(action==='directory-view')setDirectoryView(el.dataset.view);
     if(action==='map-reset')map?.reset();
     if(action==='details')details(id);
     if(action==='copy-mic-link'){
@@ -496,7 +529,10 @@ document.addEventListener('click',async e=>{
       catch{$('#mic-link').focus();$('#mic-link').select();toast('Select and copy this link.');}
     }
 
-    if(action==='locate'&&!map?.focus(id))toast('This mic has no map location yet.');
+    if(action==='locate'){
+      if(state.directoryView==='list')setDirectoryView('both');
+      if(!map?.focus(id))toast('This mic has no map location yet.');
+    }
     if(action==='demo'){state.demo=true;state.data=demoData();renderDirectory();}
     if(action==='exit-demo'){state.demo=false;await loadPublic();}
     if(action==='export'){if(state.demo){toast('Demo data is not a real schedule. Export is available after importing real sources.');return;}location.href='/api/export.csv';}
@@ -565,9 +601,10 @@ async function boot(){
   else if(['/submit','/claim-status'].includes(location.pathname)){await renderSubmit();}
   else{const selectedDate=new URLSearchParams(location.search).get('date');if(validDate(selectedDate)){state.date=selectedDate;state.day='all';}await loadPublic();const id=new URLSearchParams(location.search).get('mic');if(id){const r=findMic(id);if(r){state.date=null;state.day='all';renderDirectory();details(id);}else toast('This mic is no longer listed.');}}
 }
+setDirectoryView(state.directoryView,{persist:false,refresh:false});
 new ResizeObserver(()=>{if(!$('#view-directory').hidden)renderCards();}).observe($('#cards'));
 boot();
-// Refresh dimming in place without interrupting list scrolling or map gestures.
+// Refresh ordering and dimming in place without resetting list scroll or the map.
 setInterval(()=>{if(!document.hidden)refreshPastMics();},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPastMics();});
 // Refresh the browser's saved snapshot periodically; source checks run on the server.

@@ -69,7 +69,7 @@ class MicMap {
     root.addEventListener('pointerup',finish);
     root.addEventListener('pointercancel',finish);
     root.addEventListener('lostpointercapture',e=>{if(e.target===root)finish(e);});
-    this.observer=new ResizeObserver(()=>{this.hide();this.draw();}); this.observer.observe(root);
+    this.observer=new ResizeObserver(()=>{if([root.clientWidth,root.clientHeight,this.zoom,...this.center].join(',')!==this.viewportKey){this.hide();this.draw();}}); this.observer.observe(root);
     this.draw();
   }
   haptic(){
