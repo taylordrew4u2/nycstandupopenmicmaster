@@ -33,6 +33,25 @@ function setDirectoryView(view,{persist=true,refresh=true}={}){
   if(refresh){map?.hide();map?.draw();renderCards();}
   return true;
 }
+const textSizes={small:{scale:.9,rowHeight:59.4},normal:{scale:1,rowHeight:66},large:{scale:1.2,rowHeight:92},'extra-large':{scale:1.4,rowHeight:108}};
+state.textSize='normal';
+try{const saved=localStorage.getItem('miclist-text-size');if(Object.hasOwn(textSizes,saved))state.textSize=saved;}catch{}
+function setTextSize(size,{persist=true,refresh=true}={}){
+  if(!Object.hasOwn(textSizes,size))return;
+  state.textSize=size;
+  const root=document.documentElement,{scale,rowHeight}=textSizes[size];
+  root.dataset.textSize=size;
+  root.style.setProperty('--text-scale',scale);
+  // Numeric pixels keep the list's page-size calculation in step with CSS.
+  root.style.setProperty('--mic-row-height',`${rowHeight}px`);
+  root.style.setProperty('--popup-row-height',`${44*scale}px`);
+  if(persist){try{localStorage.setItem('miclist-text-size',size);}catch{}}
+  if(refresh){map?.hide();renderCards(false,true);}
+}
+function textSizeDialog(){
+  modal('Text size',`<div class="text-size-setting"><label for="text-size">Size</label><select id="text-size">${[['small','Small'],['normal','Standard'],['large','Large'],['extra-large','Extra large']].map(([value,label])=>`<option value="${value}" ${state.textSize===value?'selected':''}>${label}</option>`).join('')}</select><p class="text-size-sample">Upcoming open mics · 7:00 PM</p><p class="form-helper">Changes mic listings, details and map labels. Your choice is saved in this browser.</p></div>`,button('Done','close','','primary'));
+  $('#modal').dataset.view='text-size';
+}
 async function api(path,options={}){
   if(window.MICLIST_PREVIEW)throw Error('This file is a read-only interface preview. Run the included website to use the backend.');
   const opt={credentials:'same-origin',...options,headers:{'X-Requested-With':'MicList',...(options.headers||{})}};
@@ -514,6 +533,7 @@ document.addEventListener('click',async e=>{
     if(action==='copy-proposal-link'){try{await navigator.clipboard.writeText(location.href);toast('Private status link copied.');}catch{$('#proposal-status-link').focus();$('#proposal-status-link').select();toast('Select and copy your private link.');}}
     if(action==='close')$('#modal').close();
     if(action==='how')how();
+    if(action==='text-size')textSizeDialog();
     if(action==='donate'){modal('Donate','<p>Support NYC Open Mic Master List.</p><div class="donation-options"><button class="button quiet" disabled>Cash App</button><button class="button quiet" disabled>Venmo</button></div><p class="form-helper">Donation links coming soon.</p>');}
 
     if(action==='refresh'){await loadPublic();toast('Loaded the latest saved listings.');}
@@ -573,6 +593,7 @@ document.addEventListener('click',async e=>{
   }catch(err){toast(err.message);el.disabled=false;}
 });
 document.addEventListener('change',async e=>{const t=e.target;try{
+  if(t.id==='text-size')setTextSize(t.value);
   if(t.name==='frequency'){syncScheduleForm(t.form,true);if(t.form?.id==='host-edit-form')$('#host-save-state').textContent='Unsaved changes';}
   if(t.id==='host-mic-select'){if(hostDirty()&&!confirm('Discard unsaved changes and switch listings?')){t.value=state.ownerMic;return;}state.ownerMic=t.value;renderHostEditor();}
   if(t.id==='day-filter'){if(t.value==='calendar'){t.value=String(state.date||state.day);calendarMonth='';renderCalendar();return;}state.date=/^\d{4}-\d{2}-\d{2}$/.test(t.value)?t.value:null;state.day=state.date||t.value==='all'?'all':Number(t.value);renderDirectory();}
@@ -602,6 +623,7 @@ async function boot(){
   else{const selectedDate=new URLSearchParams(location.search).get('date');if(validDate(selectedDate)){state.date=selectedDate;state.day='all';}await loadPublic();const id=new URLSearchParams(location.search).get('mic');if(id){const r=findMic(id);if(r){state.date=null;state.day='all';renderDirectory();details(id);}else toast('This mic is no longer listed.');}}
 }
 setDirectoryView(state.directoryView,{persist:false,refresh:false});
+setTextSize(state.textSize,{persist:false,refresh:false});
 new ResizeObserver(()=>{if(!$('#view-directory').hidden)renderCards();}).observe($('#cards'));
 boot();
 // Refresh ordering and dimming in place without resetting list scroll or the map.

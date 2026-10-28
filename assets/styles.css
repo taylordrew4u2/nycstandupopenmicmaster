@@ -230,3 +230,53 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 /* Individual small-head pins retain a mobile-sized touch target. */
 .mic-pin{width:44px;height:44px}.mic-pin .pushpin-head{stroke-width:.6}
+
+/* Reading sizes change content, while navigation keeps its compact footprint. */
+:root{--text-scale:1;--mic-row-height:66px;--popup-row-height:44px;--detail-title-size:17px;--detail-location-size:12px}
+#cards{--row-height:var(--mic-row-height)}
+#cards .card-main{grid-template-columns:calc(53px * var(--text-scale)) minmax(0,1fr) calc(40px * var(--text-scale))}
+#cards .mic-title{font-size:calc(11px * var(--text-scale));line-height:calc(13px * var(--text-scale));max-height:calc(26px * var(--text-scale))}
+#cards .mic-time strong{font-size:calc(11px * var(--text-scale));line-height:calc(15px * var(--text-scale))}
+#cards .mic-day{font-size:calc(9px * var(--text-scale));line-height:calc(13px * var(--text-scale));overflow-wrap:anywhere}
+#cards .venue-line{font-size:calc(10px * var(--text-scale));line-height:calc(15px * var(--text-scale))}
+#cards .mic-cost{font-size:calc(10px * var(--text-scale))}
+#cards .row-updated{font-size:calc(9px * var(--text-scale));line-height:calc(12px * var(--text-scale))}
+#cards .claim-status,#cards .schedule-badge,#cards .biweekly-badge{font-size:calc(9px * var(--text-scale));line-height:calc(13px * var(--text-scale))}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .mic-meta{flex-wrap:wrap;row-gap:0}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .mic-meta .venue-line{flex:1 0 100%}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .card-main{grid-template-rows:minmax(0,1fr) auto auto;row-gap:0}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .mic-info{display:contents}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .mic-heading{grid-column:2/4;grid-row:1}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .mic-time{grid-column:1;grid-row:1;min-width:0}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .mic-day{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .mic-meta{grid-column:1/4;grid-row:2}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .row-updated{grid-column:1/3;grid-row:3;min-width:0}
+:is([data-text-size=large],[data-text-size=extra-large]) #cards .mic-cost{grid-column:3;grid-row:3}
+.map-borough,.map-legend{font-size:calc(10px * var(--text-scale))}
+.map-legend small,.map-attribution{font-size:calc(9px * var(--text-scale))}
+.map-offline{font-size:calc(10px * var(--text-scale))}
+.map-popup{max-height:calc(100% - 12px);overflow-y:auto;overscroll-behavior-y:contain}
+.map-popup>strong,.popup-mic small,.popup-mic span{font-size:calc(11px * var(--text-scale))}
+.popup-mic{height:var(--popup-row-height)}
+.popup-mic .claim-status{font-size:calc(9px * var(--text-scale));line-height:calc(13px * var(--text-scale))}
+.popup-mic .schedule-badge,.popup-mic .biweekly-badge{font-size:calc(9px * var(--text-scale))}
+#modal[data-view=mic] .modal-head h2{font-size:calc(var(--detail-title-size) * var(--text-scale))}
+#modal[data-view=mic] .detail-location{font-size:calc(var(--detail-location-size) * var(--text-scale))}
+#modal[data-view=mic] .detail-item strong,#modal[data-view=mic] .detail-panel,#modal[data-view=mic] .text-page{font-size:calc(12px * var(--text-scale))}
+#modal[data-view=mic] .detail-item p,#modal[data-view=mic] .source-detail p{font-size:calc(11px * var(--text-scale))}
+#modal[data-view=mic] .detail-item small,#modal[data-view=mic] .detail-updated{font-size:calc(9px * var(--text-scale))}
+#modal[data-view=mic] .detail-item strong{overflow-wrap:anywhere}
+.text-size-setting{display:grid;gap:10px;min-width:0}
+.text-size-setting label{font-weight:bold}
+.text-size-setting select{font-size:16px}
+.text-size-sample{font-size:calc(16px * var(--text-scale));line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:650px){
+ .directory-layout{grid-template-rows:minmax(0,1fr) min(clamp(126px,32dvh,216px),max(calc(var(--mic-row-height) + 2px),calc(100% - 126px)))}
+}
+@media(max-height:480px) and (min-width:560px){.directory-layout{grid-template-rows:minmax(0,1fr)}}
+@media(max-width:350px) and (max-height:480px){
+ [data-text-size=extra-large] .map-legend{display:flex;flex-wrap:wrap;width:max-content;max-width:calc(100% - 48px);column-gap:6px;row-gap:2px}
+ [data-text-size=extra-large] .map-legend>span{flex:none}
+ [data-text-size=extra-large] .map-legend small{flex-basis:100%}
+}
+@media(max-height:600px){:root{--detail-title-size:14px;--detail-location-size:11px}}

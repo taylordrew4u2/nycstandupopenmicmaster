@@ -50,3 +50,4 @@ jobs:
           python scripts/build_preview.py
           python tests/directory_layout_checks.py
           python tests/browser_directory_scrolling.py
+          python tests/browser_text_size.py
