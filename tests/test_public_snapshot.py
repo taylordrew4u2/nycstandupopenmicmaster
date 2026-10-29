@@ -101,6 +101,39 @@ def test_new_server_instance_reads_durable_snapshot_without_rebuild(snapshot_app
         assert visitor.get('/api/public').json() == initial
         assert visitor.get('/api/public/revision').json()['revision'] == initial['revision']
     assert_no_public_rebuild(statements)
+    assert not cold.state.store._ready, 'Public reads must not initialize or migrate the schema'
+    assert not any(sql.lstrip().lower().startswith(('create ', 'insert ', 'update ', 'delete '))
+                   for sql in statements), statements
+
+
+def test_authorized_bootstrap_materializes_existing_data_only_once(snapshot_app, monkeypatch):
+    from app.public_snapshot import INPUT_KEY, REGISTRY_KEY, REVISION_KEY, SNAPSHOT_KEY
+    app, _, database = snapshot_app
+    original = app.state.store
+    add_source(original)
+    # Reproduce a database populated by the previous deployment, before any
+    # durable directory snapshot existed. No published records are changed.
+    with original._open() as connection:
+        for key in (INPUT_KEY, REGISTRY_KEY, REVISION_KEY, SNAPSHOT_KEY):
+            connection.execute('DELETE FROM meta WHERE key=?', (key,))
+    cold = create_app(database)
+    store = cold.state.store
+    statements = trace_queries(store, monkeypatch)
+    with TestClient(cold) as visitor:
+        assert visitor.get('/api/public').json()['listings'] == []
+        assert not store._ready
+        assert_no_public_rebuild(statements)
+        assert not any(sql.lstrip().lower().startswith(('create ', 'insert ', 'update ', 'delete '))
+                       for sql in statements), statements
+        statements.clear()
+        store.ensure_public_snapshot()
+        assert store._ready
+        assert sum('select * from observations' in sql.lower() for sql in statements) == 1
+        assert sum('select * from mic_registry' in sql.lower() for sql in statements) == 1
+        assert visitor.get('/api/public').json()['listings'][0]['name'] == 'Fixture mic'
+        statements.clear()
+        store.ensure_public_snapshot()
+        assert_no_public_rebuild(statements)
 
 
 def test_rolled_back_mutation_does_not_publish_a_snapshot(snapshot_app):
