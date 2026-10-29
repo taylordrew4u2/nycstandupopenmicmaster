@@ -219,9 +219,18 @@ def create_app(db_path=None):
     async def sync_status():
         return {'last_sync_at': store.last_live_sync(), 'timezone': 'America/New_York'}
 
+    @app.get('/api/public/revision')
+    async def public_revision():
+        return await asyncio.to_thread(store.public_revision)
+
+    @app.get('/api/public/snapshot')
+    async def public_snapshot():
+        # Same approved public fields, retaining individual historical SEO IDs.
+        return await asyncio.to_thread(store.public_data)
+
     @app.get('/api/public')
     async def public():
-        return store.public_data(deduplicate=True)
+        return await asyncio.to_thread(store.public_data, deduplicate=True)
 
     @app.get('/api/sources', dependencies=[Depends(admin)])
     async def sources():

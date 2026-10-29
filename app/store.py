@@ -305,6 +305,8 @@ class Store:
         self.postgres = self.path.startswith(('postgres://', 'postgresql://'))
         self._ready = False
         self._schema_lock = threading.Lock()
+        self._public_snapshot = None
+        self._materialized = None
 
     def _open(self):
         if self.postgres:
@@ -346,10 +348,18 @@ class Store:
     def connect(self):
         if not self._ready:
             self._initialize()
+        from .public_snapshot import PublishingConnection, publish
         conn = self._open()
+        transaction = PublishingConnection(conn, self.postgres)
+        published = None
         try:
-            yield conn
+            yield transaction
+            if transaction.dirty:
+                published = publish(self, transaction)
             conn.commit()
+            if published is not None:
+                self._public_snapshot = published
+                self._materialized = transaction.materialized
         except Exception:
             conn.rollback()
             raise
@@ -358,15 +368,21 @@ class Store:
 
     def list_sources(self):
         with self.connect() as c:
-            records = c.execute('''SELECT s.*, (SELECT COUNT(*) FROM observations o WHERE o.source_id=s.id AND o.hidden=0) AS listings
-                                  FROM sources s ORDER BY s.created DESC''').fetchall()
-            result = []
-            for record in records:
-                row = dict(record)
-                row.pop('upload', None)
-                row['config'] = json.loads(row['config'])
-                result.append(row)
-            return result
+            return self._list_sources(c)
+
+    def _list_sources(self, c):
+        # Do not transfer uploaded source files on each administrative check.
+        columns = ('id,config,enabled,state,created,next_check,last_attempt,last_success,changed_at,'
+                   'etag,modified,content_hash,failure_count,error,lease_until')
+        records = c.execute('SELECT ' + columns + ', (SELECT COUNT(*) FROM observations o '
+                            'WHERE o.source_id=s.id AND o.hidden=0) AS listings '
+                            'FROM sources s ORDER BY s.created DESC').fetchall()
+        result = []
+        for record in records:
+            row = dict(record)
+            row['config'] = json.loads(row['config'])
+            result.append(row)
+        return result
 
     def get_source(self, source_id):
         with self.connect() as c:
@@ -493,11 +509,42 @@ class Store:
         return max((s['last_success'] for s in sources if s['config'].get('url')
                     and s['config']['kind'] != 'upload' and s['last_success']), default=None)
 
-    def public_data(self, include_hidden=False, deduplicate=False):
-        now = time.time()
-        sources = {s['id']: s for s in self.list_sources()}
+    def public_revision(self):
+        from .public_snapshot import read
+        return read(self, revision_only=True)
+
+    def ensure_public_snapshot(self):
+        """Bootstrap once from an authorized scheduled job, never a visitor."""
+        from .public_snapshot import REVISION_KEY
         with self.connect() as c:
-            observations = c.execute('SELECT * FROM observations WHERE hidden=0').fetchall()
+            c.execute('BEGIN IMMEDIATE')
+            if not c.execute('SELECT value FROM meta WHERE key=?', (REVISION_KEY,)).fetchone():
+                c.dirty = True
+
+    def public_data(self, include_hidden=False, deduplicate=False):
+        from .public_snapshot import read, inputs
+        if include_hidden:
+            # Management requires live permissions and never uses outage fallback.
+            with self.connect() as c:
+                c.execute('BEGIN IMMEDIATE')
+                rows, ids = inputs(self, c)
+                data = self._build_public_data(c, rows, ids, include_hidden=True)
+        else:
+            data = read(self)
+        if deduplicate:
+            data['listings'] = deduplicate_generated_occurrences(data['listings'])
+            data['listings'] = deduplicate_laughingbuddha_occurrences(data['listings'])
+        # Staleness ages without rebuilding or querying the imported records.
+        now = time.time()
+        for row in data['listings']:
+            row['stale'] = bool(row.get('stale')
+                                or now - row.get('checked_at', now) > row.pop('_stale_after', 86400))
+        return data
+
+    def _build_public_data(self, c, observations, registry, include_hidden=False):
+        now = time.time()
+        sources = {s['id']: s for s in self._list_sources(c)}
+        observations = [o for o in observations if not o['hidden']]
         from .badslava import supports as badslava_source
         from .comediq import supports as comediq_source
         from .bushwick import supports as bushwick_source
@@ -553,12 +600,10 @@ class Store:
                     final_groups.setdefault(identity + '|' + payload['start_time'], []).append(item)
             else:
                 final_groups[identity] = items
-        with self.connect() as c:
-            overlays = {r['mic_id']: dict(r) for r in c.execute('SELECT * FROM overlays')}
-            flags = {r['mic_id']: r['hidden'] for r in c.execute('SELECT * FROM mic_flags')}
-            owners = {r['mic_id']: r['owner_id'] for r in c.execute('SELECT * FROM ownership')}
-            registry = {(r['source_id'],r['remote_key']):r['mic_id'] for r in c.execute('SELECT * FROM mic_registry')}
-            locations = {r['address_key']:dict(r) for r in c.execute('SELECT * FROM locations')}
+        overlays = {r['mic_id']: dict(r) for r in c.execute('SELECT * FROM overlays')}
+        flags = {r['mic_id']: r['hidden'] for r in c.execute('SELECT * FROM mic_flags')}
+        owners = {r['mic_id']: r['owner_id'] for r in c.execute('SELECT * FROM ownership')}
+        locations = {r['address_key']:dict(r) for r in c.execute('SELECT * FROM locations')}
         # Reunite source observations that already share a stable mic ID, even
         # when one source renames its listing. This avoids duplicate public IDs.
         stable_groups = {}
@@ -582,17 +627,18 @@ class Store:
             ambiguous_sources = {source_id for source_id, count in
                                  Counter(series[0] for series in series_keys).items() if count > 1}
             for o, payload, source in items:
-                registry_new.append((o['source_id'], o['remote_key'], mic_id))
+                if registry.get((o['source_id'], o['remote_key'])) != mic_id:
+                    registry_new.append((o['source_id'], o['remote_key'], mic_id))
+                    registry[(o['source_id'], o['remote_key'])] = mic_id
                 series = recurring_source_key(source, payload)
                 if series and source['id'] not in ambiguous_sources:
                     recurring_members[series].add(mic_id)
-        with self.connect() as c:
-            c.execute('BEGIN IMMEDIATE')
+        if registry_new:
             c.executemany('INSERT INTO mic_registry VALUES (?,?,?) ON CONFLICT(source_id,remote_key) DO UPDATE SET mic_id=excluded.mic_id', registry_new)
-            self._inherit_recurring_ownership(c, recurring_members)
-            # Read after reconciliation and under the same lock as revocation.
-            owners = {r['mic_id']: r['owner_id'] for r in c.execute('SELECT * FROM ownership')}
-            overlays = {r['mic_id']: dict(r) for r in c.execute('SELECT * FROM overlays')}
+        self._inherit_recurring_ownership(c, recurring_members)
+        # Reconciliation and publication share the lock held by revocation.
+        owners = {r['mic_id']: r['owner_id'] for r in c.execute('SELECT * FROM ownership')}
+        overlays = {r['mic_id']: dict(r) for r in c.execute('SELECT * FROM overlays')}
         from .venue_confirmation import official_venue_source
         listings = []
         conflict_fields = ['start_time', 'signup_time', 'cost', 'purchase_minimum', 'set_minutes', 'status', 'address']
@@ -645,10 +691,8 @@ class Store:
                              'curated':bool(curated),'curated_at':curated['updated'] if curated else None,
                              'overridden_fields':list(json.loads(curated['payload'])) if curated else [],
                              'checked_at': observation['last_seen'], 'updated_at': observation['updated'],
-                             'conflicts': conflicts, 'stale': bool(stale), 'host_confirmed_at': host_confirmed})
-        if deduplicate:
-            listings = deduplicate_generated_occurrences(listings)
-            listings = deduplicate_laughingbuddha_occurrences(listings)
+                             'conflicts': conflicts, 'stale': bool(stale),
+                             '_stale_after': max(86400, source['config']['interval_minutes'] * 240), 'host_confirmed_at': host_confirmed})
         return {'listings': listings, 'source_count': len(sources), 'last_check': max((s['last_success'] or 0 for s in sources.values()), default=None),
                 'last_sync_at': self.last_live_sync(sources.values()),
                 'timezone': 'America/New_York', 'mode': 'live' if sources else 'empty'}

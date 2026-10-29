@@ -42,6 +42,8 @@ def authorize(header):
 
 
 async def run_due(store, sync_one, budget=220):
+    await asyncio.to_thread(store.ensure_public_snapshot)
+
     def summary():
         sources = store.list_sources()
         enabled = [s for s in sources if s['enabled'] and s['config']['kind'] != 'upload']
