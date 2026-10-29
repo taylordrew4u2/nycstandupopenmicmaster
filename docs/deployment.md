@@ -49,6 +49,37 @@ geocoding.
 GitHub may delay scheduled workflows and disables them in public repositories after
 60 days without activity. Watch the heartbeat and re-enable the workflow if needed.
 
+### Public directory snapshots
+
+The public directory and crawlable mic pages read a saved public projection from
+the existing database's `meta` table. Public visits do not merge observations,
+register mic IDs, or reconcile host ownership. The browser checks
+`/api/public/revision` for a small revision response and downloads `/api/public`
+again only when that revision changes. Admin and host responses remain uncached.
+
+Published changes update the snapshot in the same transaction as the change.
+Compressed materialized observations and registry mappings let later updates
+replay their changes without downloading every historical observation payload.
+The initial publication bootstraps those inputs once. No additional storage
+service, credential, or subscription is required.
+
+When the database is unavailable, a warm process can serve its last successful
+public snapshot. A cold process can use the public-only snapshot bundled with the
+deployment. The directory labels fallback data with its saved date. That bundled
+copy is frozen at deployment time: listings edited or hidden after that date may
+still appear in it during a database outage. Redeploy with a fresh public snapshot
+to update the cold-start fallback. Before a release, run
+`python scripts/save_public_snapshot.py https://nycopenmicmasterlist.com` and commit
+the resulting public-only gzip file. The snapshot export retains historical public
+IDs for dated mic pages; the normal directory still applies its existing deduplication.
+Snapshots never authorize host or admin writes;
+those operations still require the live database and current permissions.
+
+This reduces future database traffic. It does not erase already recorded usage,
+change provider quotas or billing-cycle dates, or guarantee uninterrupted free
+service. Database restrictions can still prevent new imports, edits, and account
+operations while public browsing continues from the saved directory.
+
 ### Custom domain
 
 The public domain is `https://nycopenmicmasterlist.com`. Canonical URLs, About

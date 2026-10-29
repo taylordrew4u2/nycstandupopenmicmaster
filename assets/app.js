@@ -54,7 +54,7 @@ function textSizeDialog(){
 }
 async function api(path,options={}){
   if(window.MICLIST_PREVIEW)throw Error('This file is a read-only interface preview. Run the included website to use the backend.');
-  const opt={credentials:'same-origin',...options,headers:{'X-Requested-With':'MicList',...(options.headers||{})}};
+  const opt={credentials:'same-origin',cache:'no-store',...options,headers:{'X-Requested-With':'MicList',...(options.headers||{})}};
   if(opt.body&&!(opt.body instanceof FormData)){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(opt.body);}
   const response=await fetch(path,opt);let data;try{data=await response.json();}catch{throw Error('The server returned an unreadable response.');}
   if(!response.ok){const msg=typeof data.detail==='string'?data.detail:Array.isArray(data.detail)?data.detail.map(r=>r.msg).join('; '):'Request failed';throw Object.assign(Error(msg),{status:response.status});}return data;
@@ -87,11 +87,42 @@ function showLastSync(value){
   label.textContent='LAST SYNC AT '+stamp;label.title=value?'Latest successful online source check':'No successful online source check recorded';
 }
 async function loadSyncStatus(){try{const status=await api('/api/sync-status');showLastSync(status.last_sync_at);}catch{if($('#last-sync'))$('#last-sync').textContent='LAST SYNC AT unavailable';}}
+function showPublicStatus(){
+  showLastSync(state.demo?null:state.data.last_sync_at);
+  const banner=$('#preview-banner');
+  banner.hidden=!state.demo&&!(state.publicLoaded&&(state.data.stale||state.publicUnavailable));
+  if(state.demo){banner.innerHTML=`Demo · Fictional mics${window.MICLIST_PREVIEW?'':' <button data-action="exit-demo">Exit demo</button>'}`;return;}
+  if(!banner.hidden){
+    const stamp=state.data.snapshot_at?new Intl.DateTimeFormat('en-US',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:'America/New_York',timeZoneName:'short'}).format(new Date(state.data.snapshot_at*1000)):'an earlier successful update';
+    banner.textContent=`Showing the saved directory from ${stamp}. Updates are temporarily unavailable.`;
+  }
+}
+let publicLoad=null,revisionCheck=false;
 async function loadPublic(){
   if(!map)map=new MicMap($('#nyc-map'),id=>details(id),()=>renderCards(true));
+  if(!state.demo&&state.data.mode==='demo'){state.data={listings:[],source_count:0,mode:'empty'};map.setRows([]);}
   if(!state.data.listings.length&&!state.demo)$('#cards').innerHTML='<p class="directory-loading" role="status">Loading mics…</p>';
-  if(state.demo){state.data=demoData();renderDirectory();return;}
-  try{state.data=await api('/api/public');renderDirectory();}catch(err){$('#directory-status').textContent='Directory unavailable';$('#cards').innerHTML=blank('Could not load the directory.',esc(err.message),button('Try again','refresh'));}
+  if(state.demo){state.data=demoData();state.publicLoaded=false;renderDirectory();return;}
+  if(publicLoad)return publicLoad;
+  publicLoad=(async()=>{
+    try{const data=await api('/api/public');if(state.demo)return;state.data=data;state.publicLoaded=true;state.publicUnavailable=false;renderDirectory();}
+    catch(err){
+      if(state.demo)return;
+      if(state.publicLoaded){state.publicUnavailable=true;showPublicStatus();}
+      else{showPublicStatus();$('#directory-status').textContent='Directory unavailable';$('#cards').innerHTML=blank('Could not load the directory.',esc(err.message),button('Try again','refresh'));}
+    }
+  })();
+  try{await publicLoad;}finally{publicLoad=null;}
+}
+async function refreshPublicRevision(){
+  if(publicLoad||revisionCheck||document.hidden||state.demo||location.pathname!=='/')return;
+  revisionCheck=true;
+  try{
+    const latest=await api('/api/public/revision');
+    if(!state.publicLoaded||latest.revision!==state.data.revision)await loadPublic();
+    else{Object.assign(state.data,{snapshot_at:latest.snapshot_at,stale:latest.stale,last_sync_at:latest.last_sync_at});state.publicUnavailable=false;showPublicStatus();}
+  }catch{if(state.publicLoaded){state.publicUnavailable=true;showPublicStatus();}}
+  finally{revisionCheck=false;}
 }
 const validDate=d=>typeof d==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d)&&!Number.isNaN(Date.parse(d+'T12:00:00Z'))&&new Date(d+'T12:00:00Z').toISOString().slice(0,10)===d;
 const generatedSourceDate=row=>row.frequency!=='one-time'&&(row.sources||[]).some(s=>s.url==='https://comediq.us/mics.json')&&!row.overridden_fields?.includes('date');
@@ -216,9 +247,7 @@ function filtered(now=new Date()){return sortDirectoryRows(state.data.listings.f
   if(state.signup!=='all'&&!String(r.signup_method).toLowerCase().includes(state.signup))return false;return true;
 }),now);}
 function renderDirectory(){
-  showLastSync(state.demo?null:state.data.last_sync_at);
-  $('#preview-banner').hidden=!state.demo;
-  $('#preview-banner').innerHTML=`Demo · Fictional mics${window.MICLIST_PREVIEW?'':' <button data-action="exit-demo">Exit demo</button>'}`;
+  showPublicStatus();
   $('#directory-status').textContent=state.demo?'Fictional examples':`${state.data.listings.length} listings`;
   const dateOptions=Array.from({length:7},(_,i)=>{const d=new Date(nyToday()+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+i);const date=d.toISOString().slice(0,10);return [date,d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',timeZone:'UTC'})+(i===0?' · Today':'')];});
   if(state.date&&!dateOptions.some(([v])=>v===state.date))dateOptions.unshift([state.date,new Date(state.date+'T12:00:00Z').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',timeZone:'UTC'})]);
@@ -553,7 +582,7 @@ document.addEventListener('click',async e=>{
       if(state.directoryView==='list')setDirectoryView('both');
       if(!map?.focus(id))toast('This mic has no map location yet.');
     }
-    if(action==='demo'){state.demo=true;state.data=demoData();renderDirectory();}
+    if(action==='demo'){state.demo=true;await loadPublic();}
     if(action==='exit-demo'){state.demo=false;await loadPublic();}
     if(action==='export'){if(state.demo){toast('Demo data is not a real schedule. Export is available after importing real sources.');return;}location.href='/api/export.csv';}
     if(action==='submit-report')submission(id,'report');
@@ -629,8 +658,8 @@ boot();
 // Refresh ordering and dimming in place without resetting list scroll or the map.
 setInterval(()=>{if(!document.hidden)refreshPastMics();},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPastMics();});
-// Refresh the browser's saved snapshot periodically; source checks run on the server.
-setInterval(()=>{if(!document.hidden&&!state.demo&&location.pathname==='/')loadPublic();},60000);
+// Poll only the small revision; reload listings when the saved directory changes.
+setInterval(refreshPublicRevision,60000);
 
 
 

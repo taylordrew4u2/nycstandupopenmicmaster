@@ -43,6 +43,7 @@ jobs:
           node tests/past_mic_logic.cjs
           node tests/map_viewport.cjs
           node tests/map_individual_pins.cjs
+          node tests/public_revision.cjs
       - name: Install browser for directory checks
         run: python -m playwright install --with-deps chromium
       - name: Directory layout, scrolling and map interaction
@@ -51,3 +52,4 @@ jobs:
           python tests/directory_layout_checks.py
           python tests/browser_directory_scrolling.py
           python tests/browser_text_size.py
+          python tests/browser_public_snapshot.py
