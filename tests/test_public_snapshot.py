@@ -14,6 +14,18 @@ from app.parsers import normalize_rows
 HEADERS = {'X-Requested-With': 'MicList'}
 
 
+def test_healthy_empty_database_does_not_use_production_bundle(database, monkeypatch, tmp_path):
+    from app import public_snapshot
+    monkeypatch.setenv('SCHEDULER_ENABLED', '0')
+    monkeypatch.setattr(public_snapshot, 'FALLBACK_PATH', tmp_path / 'must-not-be-used.gz')
+    app = create_app(database)
+    app.state.store._initialize()
+    with TestClient(app) as visitor:
+        data = visitor.get('/api/public').json()
+        assert data['listings'] == [] and data['mode'] == 'empty' and not data['stale']
+        assert visitor.get('/api/public/revision').json()['revision'] == 'empty'
+
+
 @pytest.fixture
 def snapshot_app(tmp_path, monkeypatch):
     password = secrets.token_urlsafe(24)

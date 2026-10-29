@@ -189,6 +189,12 @@ def validate_public(data):
     return data
 
 
+def empty():
+    return {'listings': [], 'source_count': 0, 'last_check': None, 'last_sync_at': None,
+            'timezone': 'America/New_York', 'mode': 'empty',
+            'revision': 'empty', 'snapshot_at': 0, 'stale': False}
+
+
 def fallback(store):
     cached = store._public_snapshot
     if cached is not None:
@@ -199,10 +205,7 @@ def fallback(store):
             data = json.load(source)
         validate_public(data)
     else:
-        data = {'listings': [], 'source_count': 0, 'last_check': None, 'last_sync_at': None,
-                'timezone': 'America/New_York', 'mode': 'empty',
-                'revision': 'empty', 'snapshot_at': 0, 'stale': False}
-        return data
+        return empty()
     data['stale'] = True
     return data
 
@@ -213,6 +216,10 @@ def read(store, revision_only=False):
         with closing(store._open()) as c:
             row = c.execute('SELECT value FROM meta WHERE key=?', (REVISION_KEY,)).fetchone()
             if not row:
+                # A healthy new installation is empty; a legacy populated
+                # database waits for its first authorized publication.
+                if not c.execute('SELECT 1 FROM sources LIMIT 1').fetchone():
+                    return metadata(empty()) if revision_only else empty()
                 return metadata(fallback(store)) if revision_only else fallback(store)
             current = json.loads(row[0])
             if revision_only:
