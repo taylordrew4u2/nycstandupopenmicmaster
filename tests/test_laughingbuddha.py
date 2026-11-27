@@ -7,8 +7,8 @@ import pytest
 from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
 
-from app.laughingbuddha import (BOX_OFFICE, EASTVILLE_VENUES_URL, VENUES_URL,
-                               calendar_rows, event_links, fetch_feed, supports)
+from app.laughingbuddha import (BOX_OFFICE, VENUES_URL, calendar_rows,
+                               event_links, fetch_feed, supports)
 from app.main import create_app
 from app.models import SourceConfig
 from app.parsers import extract
@@ -24,9 +24,7 @@ def fixture(name):
 
 
 def venue_text():
-    buddha = BeautifulSoup(fixture('venues.html'), 'html.parser').get_text(' ', strip=True)
-    # Official Eastville location page lists this address.
-    return buddha + ' 487 Atlantic Ave, Brooklyn, NY 11217'
+    return BeautifulSoup(fixture('venues.html'), 'html.parser').get_text(' ', strip=True)
 
 
 def source_config():
@@ -174,8 +172,6 @@ def test_bounded_feed_uses_fetcher_for_every_page_and_does_not_return_partial_re
             content = index
         elif url == VENUES_URL:
             content = fixture('venues.html')
-        elif url == EASTVILLE_VENUES_URL:
-            content = b'<p>487 Atlantic Ave</p><p>Brooklyn, NY 11217</p>'
         elif url.endswith('/1071006'):
             content = eastville_fixture()
         else:
@@ -186,8 +182,7 @@ def test_bounded_feed_uses_fetcher_for_every_page_and_does_not_return_partial_re
     content = asyncio.run(fetch_feed(fetcher, TODAY))
     result = extract(content, source_config())
     assert len(result['rows']) == 16 and result['skipped'] == 0
-    assert calls == [BOX_OFFICE, VENUES_URL, EASTVILLE_VENUES_URL,
-                     *event_links(index)]
+    assert calls == [BOX_OFFICE, VENUES_URL, *event_links(index)]
 
     async def failed_fetch(url):
         if url.endswith('/1071619'):

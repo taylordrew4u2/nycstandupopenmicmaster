@@ -18,7 +18,6 @@ from bs4 import BeautifulSoup
 NY = ZoneInfo('America/New_York')
 BOX_OFFICE = 'https://www.tickettailor.com/events/laughingbuddhacomedy'
 VENUES_URL = 'https://www.laughingbuddhacomedy.com/venues'
-EASTVILLE_VENUES_URL = 'https://www.eastvillecomedy.com/locations'
 MAX_SERIES = 60
 _SERIES_PATH = re.compile(r'/events/laughingbuddhacomedy/(\d+)/?')
 _MIC = re.compile(r'\bmics?\b', re.I)
@@ -90,7 +89,15 @@ def _venue_address(event, description, official_venues):
                  'The Stand': '116 E 16th St New York, NY 10003',
                  'New York Comedy Club - UWS': '236 W 78th St New York, NY 10024'}
         address = known.get(venue, '')
-        if not address or not _confirmed_address(address, official_venues):
+        if not address:
+            label = venue or _clean(event.get('name')) or 'unnamed venue'
+            raise ValueError(f'Laughing Buddha street address for {label} is not confirmed; review required.')
+        if venue == 'Eastville Comedy Club':
+            event_address = location.get('address', {})
+            postal_code = str(event_address.get('postalCode', '')) if isinstance(event_address, dict) else ''
+            if postal_code != '11217':
+                raise ValueError('Eastville venue ZIP is not confirmed; review required.')
+        elif not _confirmed_address(address, official_venues):
             label = venue or _clean(event.get('name')) or 'unnamed venue'
             raise ValueError(f'Laughing Buddha street address for {label} is not confirmed; review required.')
     if venue not in ('The Buddha Room', 'The Rose', 'The Stand', 'New York Comedy Club - UWS', 'Eastville Comedy Club') or not re.search(r'\b(?:100\d{2}|11217)\b', address):
@@ -191,10 +198,6 @@ async def fetch_feed(fetcher, today=None):
             index = await fetcher.fetch(BOX_OFFICE)
             venues = await fetcher.fetch(VENUES_URL)
             venue_text = _clean(BeautifulSoup(venues['content'], 'html.parser').get_text(' ', strip=True))
-            index_text = BeautifulSoup(index['content'], 'html.parser').get_text(' ', strip=True)
-            if re.search(r'\bEastVille\b|\bEastville Comedy Club\b', index_text, re.I):
-                eastville = await fetcher.fetch(EASTVILLE_VENUES_URL)
-                venue_text += ' ' + _clean(BeautifulSoup(eastville['content'], 'html.parser').get_text(' ', strip=True))
             rows = []
             for url in event_links(index['content']):
                 result = await fetcher.fetch(url)
