@@ -7,8 +7,8 @@ import pytest
 from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
 
-from app.laughingbuddha import (BOX_OFFICE, VENUES_URL, calendar_rows,
-                               event_links, fetch_feed, supports)
+from app.laughingbuddha import (BOX_OFFICE, EASTVILLE_VENUES_URL, VENUES_URL,
+                               calendar_rows, event_links, fetch_feed, supports)
 from app.main import create_app
 from app.models import SourceConfig
 from app.parsers import extract
@@ -24,7 +24,9 @@ def fixture(name):
 
 
 def venue_text():
-    return BeautifulSoup(fixture('venues.html'), 'html.parser').get_text(' ', strip=True)
+    buddha = BeautifulSoup(fixture('venues.html'), 'html.parser').get_text(' ', strip=True)
+    # Official Eastville location page lists this address.
+    return buddha + ' 487 Atlantic Ave Brooklyn, NY 11217'
 
 
 def source_config():
@@ -77,6 +79,29 @@ def test_ticket_tailor_location_name_with_postcode_maps_to_official_buddha_room(
     assert all(row['venue'] == 'The Buddha Room' for row in rows)
     assert all(row['address'] == '410 8th Ave, 2nd Floor New York, NY 10001'
                for row in rows)
+
+
+def eastville_fixture():
+    soup = BeautifulSoup(fixture('1071619.html'), 'html.parser')
+    section = soup.select_one('.event-page-description')
+    section.clear()
+    section.append('Standard mic guidelines. No street address in the Ticket Tailor page.')
+    for script in soup.select('script[type="application/ld+json"]'):
+        event = json.loads(script.get_text())
+        event['name'] = event['name'].replace('@The Stand', '@EastVille')
+        event['location']['name'] = 'Eastville Comedy Club'
+        event['location']['address'] = {'streetAddress': 'Eastville Comedy Club',
+                                        'postalCode': '11217'}
+        script.string = json.dumps(event)
+    return str(soup).encode()
+
+
+def test_eastville_mics_use_verified_brooklyn_address_and_borough():
+    rows = calendar_rows(eastville_fixture(), BOX_OFFICE + '/1071006', venue_text(), TODAY)
+    assert rows
+    assert all(row['venue'] == 'Eastville Comedy Club' for row in rows)
+    assert all(row['address'] == '487 Atlantic Ave Brooklyn, NY 11217' for row in rows)
+    assert all(row['borough'] == 'Brooklyn' for row in rows)
 
 
 def test_festival_timestamp_overrides_static_series_title_without_weekly_inference():
@@ -141,16 +166,28 @@ def test_missing_or_ambiguous_date_details_require_review_and_audience_fees_stay
 def test_bounded_feed_uses_fetcher_for_every_page_and_does_not_return_partial_results():
     calls = []
 
+    index = fixture('index.html') + b'\n<h3 class="event__title"><a href="/events/laughingbuddhacomedy/1071006">Friday 6:00 PM Open Mic @EastVille</a></h3>'
+
     async def fetch(url):
         calls.append(url)
-        name = 'index.html' if url == BOX_OFFICE else 'venues.html' if url == VENUES_URL else url.rsplit('/', 1)[-1] + '.html'
-        return {'content': fixture(name)}
+        if url == BOX_OFFICE:
+            content = index
+        elif url == VENUES_URL:
+            content = fixture('venues.html')
+        elif url == EASTVILLE_VENUES_URL:
+            content = b'<p>487 Atlantic Ave</p><p>Brooklyn, NY 11217</p>'
+        elif url.endswith('/1071006'):
+            content = eastville_fixture()
+        else:
+            content = fixture(url.rsplit('/', 1)[-1] + '.html')
+        return {'content': content}
 
     fetcher = type('Fetcher', (), {'fetch': staticmethod(fetch)})()
     content = asyncio.run(fetch_feed(fetcher, TODAY))
     result = extract(content, source_config())
-    assert len(result['rows']) == 14 and result['skipped'] == 0
-    assert calls == [BOX_OFFICE, VENUES_URL, *event_links(fixture('index.html'))]
+    assert len(result['rows']) == 16 and result['skipped'] == 0
+    assert calls == [BOX_OFFICE, VENUES_URL, EASTVILLE_VENUES_URL,
+                     *event_links(index)]
 
     async def failed_fetch(url):
         if url.endswith('/1071619'):
