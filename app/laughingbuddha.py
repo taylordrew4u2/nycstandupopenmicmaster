@@ -77,7 +77,8 @@ def _venue_address(event, description, official_venues):
     if match:
         address = match[1]
     else:
-        known = {'The Stand': '116 E 16th St New York, NY 10003',
+        known = {'The Buddha Room': '410 8th Ave, 2nd Floor New York, NY 10001',
+                 'The Stand': '116 E 16th St New York, NY 10003',
                  'New York Comedy Club - UWS': '236 W 78th St New York, NY 10024'}
         address = known.get(venue, '')
         if not address or address.casefold() not in official_venues.casefold():
