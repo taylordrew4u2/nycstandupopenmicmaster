@@ -62,6 +62,23 @@ def test_explicit_dates_prices_and_addresses_from_real_registration_pages():
     assert result['rows'][0]['cost'] == 7.75
 
 
+def test_ticket_tailor_location_name_with_postcode_maps_to_official_buddha_room():
+    soup = BeautifulSoup(fixture('2124933.html'), 'html.parser')
+    soup.select_one('.event-page-description').clear()
+    soup.select_one('.event-page-description').append('No street address in this description.')
+    for script in soup.select('script[type="application/ld+json"]'):
+        event = json.loads(script.get_text())
+        event['location']['name'] = 'Laughing Buddha Comedy, 10001'
+        event['location']['address'] = {'streetAddress': 'Laughing Buddha Comedy',
+                                        'postalCode': '10001'}
+        script.string = json.dumps(event)
+    rows = calendar_rows(str(soup), BOX_OFFICE + '/2124933', venue_text(), TODAY)
+    assert rows
+    assert all(row['venue'] == 'The Buddha Room' for row in rows)
+    assert all(row['address'] == '410 8th Ave, 2nd Floor New York, NY 10001'
+               for row in rows)
+
+
 def test_festival_timestamp_overrides_static_series_title_without_weekly_inference():
     rows = calendar_rows(fixture('2228278.html'), BOX_OFFICE + '/2228278', venue_text(), TODAY)
     assert [(r['date'], r['start_time']) for r in rows] == [('2026-10-31', '20:00'), ('2026-11-07', '21:45')]

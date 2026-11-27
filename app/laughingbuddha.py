@@ -69,7 +69,8 @@ def _venue_address(event, description, official_venues):
     if not isinstance(location, dict):
         raise ValueError('Laughing Buddha venue details changed; review required.')
     venue = _clean(location.get('name'))
-    if venue == 'Laughing Buddha Comedy':
+    # Ticket Tailor now appends the venue ZIP to this location name.
+    if re.fullmatch(r'Laughing Buddha Comedy(?:\s*,?\s*10001)?', venue, re.I):
         venue = 'The Buddha Room'
     # Some ticket pages supply only a venue name as their structured address.
     # Prefer the full street address printed in the mic's own description.
@@ -82,7 +83,8 @@ def _venue_address(event, description, official_venues):
                  'New York Comedy Club - UWS': '236 W 78th St New York, NY 10024'}
         address = known.get(venue, '')
         if not address or address.casefold() not in official_venues.casefold():
-            raise ValueError('Laughing Buddha street address is not confirmed; review required.')
+            label = venue or _clean(event.get('name')) or 'unnamed venue'
+            raise ValueError(f'Laughing Buddha street address for {label} is not confirmed; review required.')
     if venue not in ('The Buddha Room', 'The Rose', 'The Stand', 'New York Comedy Club - UWS') or not re.search(r'\b100\d{2}\b', address):
         raise ValueError('Laughing Buddha venue location needs review.')
     return venue, address
