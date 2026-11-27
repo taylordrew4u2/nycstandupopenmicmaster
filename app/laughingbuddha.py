@@ -34,6 +34,12 @@ def _clean(value):
     return re.sub(r'\s+', ' ', str(value or '')).strip()
 
 
+def _confirmed_address(address, official_venues):
+    compact_address = re.sub(r'[^a-z0-9]', '', address.casefold())
+    compact_official = re.sub(r'[^a-z0-9]', '', official_venues.casefold())
+    return bool(compact_address and compact_address in compact_official)
+
+
 def event_links(content):
     soup = BeautifulSoup(content, 'html.parser')
     links = []
@@ -84,7 +90,7 @@ def _venue_address(event, description, official_venues):
                  'The Stand': '116 E 16th St New York, NY 10003',
                  'New York Comedy Club - UWS': '236 W 78th St New York, NY 10024'}
         address = known.get(venue, '')
-        if not address or address.casefold() not in official_venues.casefold():
+        if not address or not _confirmed_address(address, official_venues):
             label = venue or _clean(event.get('name')) or 'unnamed venue'
             raise ValueError(f'Laughing Buddha street address for {label} is not confirmed; review required.')
     if venue not in ('The Buddha Room', 'The Rose', 'The Stand', 'New York Comedy Club - UWS', 'Eastville Comedy Club') or not re.search(r'\b(?:100\d{2}|11217)\b', address):

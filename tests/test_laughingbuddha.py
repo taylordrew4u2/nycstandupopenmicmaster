@@ -26,7 +26,7 @@ def fixture(name):
 def venue_text():
     buddha = BeautifulSoup(fixture('venues.html'), 'html.parser').get_text(' ', strip=True)
     # Official Eastville location page lists this address.
-    return buddha + ' 487 Atlantic Ave Brooklyn, NY 11217'
+    return buddha + ' 487 Atlantic Ave, Brooklyn, NY 11217'
 
 
 def source_config():
