@@ -70,7 +70,7 @@ def _venue_address(event, description, official_venues):
         raise ValueError('Laughing Buddha venue details changed; review required.')
     venue = _clean(location.get('name'))
     # Ticket Tailor now appends the venue ZIP to this location name.
-    if re.fullmatch(r'Laughing Buddha Comedy(?:\\s*,?\\s*10001)?', venue, re.I):
+    if re.fullmatch(r'Laughing Buddha Comedy(?:\s*,?\s*10001)?', venue, re.I):
         venue = 'The Buddha Room'
     # Some ticket pages supply only a venue name as their structured address.
     # Prefer the full street address printed in the mic's own description.
